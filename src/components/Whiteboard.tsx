@@ -26,14 +26,15 @@ interface DrawingState {
 interface WhiteboardProps {
   width?: number;
   height?: number;
+  isDrawingMode?: boolean;
 }
 
 // 配置画笔函数
-const configureBrush = (canvas: FabricCanvas, size: number) => {
+const configureBrush = (canvas: FabricCanvas, size: number, color: string) => {
   console.log('[Whiteboard configureBrush] Configuring brush with size:', size);
   const brush = new fabric.PencilBrush(canvas);
   brush.width = size;
-  brush.color = '#000000';
+  brush.color = color;
   
   // 添加贝塞尔曲线平滑
   (brush as any).decimate = 8;         // 采样点间隔
@@ -43,13 +44,15 @@ const configureBrush = (canvas: FabricCanvas, size: number) => {
 
 const Whiteboard = ({ 
   width = 800, 
-  height = 600 
+  height = 600,
+  isDrawingMode = true
 }: WhiteboardProps) => {
   console.log('[Whiteboard] Component rendered/re-rendered');
   // 浮动菜单状态
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [clickPosition, setClickPosition] = useState<{ x: number; y: number } | null>(null);
   const [brushSize, setBrushSize] = useState(5);
+  const [brushColor, setBrushColor] = useState('#000000');
   const [history, setHistory] = useState<DrawingState[]>([]);
   
   // 贴纸按钮状态
@@ -86,18 +89,18 @@ const Whiteboard = ({
         });
       }
 
-      canvas.isDrawingMode = true;
-      canvas.freeDrawingBrush = configureBrush(canvas, brushSize);
+      canvas.isDrawingMode = isDrawingMode;
+      canvas.freeDrawingBrush = configureBrush(canvas, brushSize, brushColor);
 
       setHistory(prev => prev.slice(0, -1));
     } catch (error) {
       console.error('[Whiteboard handleUndo] Failed to undo:', error);
     }
-  }, [history, brushSize]);
+  }, [history, brushSize, brushColor, isDrawingMode]);
 
   // 初始化画布
   useEffect(() => {
-    console.log('[Whiteboard useEffect] Running. Deps:', { width, height, brushSize, handleUndo: typeof handleUndo });
+    console.log('[Whiteboard useEffect] Running. Deps:', { width, height, brushSize, brushColor, isDrawingMode, handleUndo: typeof handleUndo });
     
     if (!canvasElRef.current || history.length > 0) return;
 
@@ -105,7 +108,7 @@ const Whiteboard = ({
       width,
       height,
       backgroundColor: '#ffffff',
-      isDrawingMode: true
+      isDrawingMode: isDrawingMode
     }) as FabricCanvas;
 
     console.log('[Whiteboard useEffect] Fabric canvas initialized:', fabricCanvasRef.current);
@@ -118,8 +121,8 @@ const Whiteboard = ({
     setHistory([initialState]);
 
     // 设置为绘画模式
-    canvas.isDrawingMode = true;
-    canvas.freeDrawingBrush = configureBrush(canvas, brushSize);
+    canvas.isDrawingMode = isDrawingMode;
+    canvas.freeDrawingBrush = configureBrush(canvas, brushSize, brushColor);
     
     // 设置画布属性
     canvas.renderOnAddRemove = true;
@@ -210,7 +213,7 @@ const Whiteboard = ({
         console.log('[Whiteboard useEffect Cleanup] Canvas disposed, ref set to null.');
       }
     };
-  }, [width, height, brushSize, handleUndo, history.length]);
+  }, [width, height, brushSize, brushColor, isDrawingMode, handleUndo, history.length]);
 
   // 处理画笔大小变化
   const handleBrushSizeChange = useCallback((newSize: number) => {
