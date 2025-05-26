@@ -52,6 +52,7 @@ const Whiteboard = ({
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [clickPosition, setClickPosition] = useState<{ x: number; y: number } | null>(null);
   const [brushSize, setBrushSize] = useState(5);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [brushColor, setBrushColor] = useState('#000000');
   const [history, setHistory] = useState<DrawingState[]>([]);
   
