@@ -42,13 +42,19 @@ const configureBrush = (canvas: FabricCanvas, size: number, color: string) => {
   return brush;
 };
 
+// Whiteboard component: Main component for the drawing canvas
 const Whiteboard = ({ 
   width = 800, 
-  height = 600,
-  isDrawingMode = true
+  height = 600, 
+  isDrawingMode: initialIsDrawingMode = true // Renamed prop to avoid conflict with canvas property
 }: WhiteboardProps) => {
   console.log('[Whiteboard] Component rendered/re-rendered');
-  // 浮动菜单状态
+
+  // Refs for canvas DOM element and Fabric canvas instance
+  const canvasElRef = useRef<HTMLCanvasElement>(null);
+  const fabricCanvasRef = useRef<FabricCanvas | null>(null);
+
+  // State for UI elements and drawing properties
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [clickPosition, setClickPosition] = useState<{ x: number; y: number } | null>(null);
   const [brushSize, setBrushSize] = useState(5);
@@ -56,182 +62,182 @@ const Whiteboard = ({
   const [brushColor, setBrushColor] = useState('#000000');
   const [history, setHistory] = useState<DrawingState[]>([]);
   
-  // 贴纸按钮状态
+  // State for sticker button visibility and position
   const [stickerButtonPosition, setStickerButtonPosition] = useState<FloatingButtonPosition | null>(null);
-  const canvasElRef = useRef<HTMLCanvasElement>(null);
-  const fabricCanvasRef = useRef<FabricCanvas | null>(null);
-  
-  // 撤销功能
-  const handleUndo = useCallback(() => {
-    console.log('[Whiteboard handleUndo] Undo called. History length:', history.length);
-    
-    if (history.length <= 1 || !fabricCanvasRef.current) {
-      console.log('[Whiteboard handleUndo] Cannot undo: no history or no canvas');
+
+  // --- Callbacks --- 
+
+  // Callback to record the current canvas state for undo history
+  const recordState = useCallback(() => {
+    const currentCanvas = fabricCanvasRef.current;
+    if (!currentCanvas) {
+      console.warn('[Whiteboard recordState] Canvas ref is null, cannot record state.');
       return;
     }
-
-    const canvas = fabricCanvasRef.current;
-    const previousState = history[history.length - 2];
-
-    try {
-      const state = JSON.parse(previousState.canvasState);
-      canvas.clear();
-
-      if (state.objects) {
-        state.objects.forEach((obj: any) => {
-          const path = new fabric.Path(obj.path, obj) as FabricObject;
-          path.set({
-            selectable: false,
-            hasControls: false,
-            evented: false
-          });
-          canvas.add(path);
-          canvas.renderAll();
-        });
-      }
-
-      canvas.isDrawingMode = isDrawingMode;
-      canvas.freeDrawingBrush = configureBrush(canvas, brushSize, brushColor);
-
-      setHistory(prev => prev.slice(0, -1));
-    } catch (error) {
-      console.error('[Whiteboard handleUndo] Failed to undo:', error);
-    }
-  }, [history, brushSize, brushColor, isDrawingMode]);
-
-  // 初始化画布
-  useEffect(() => {
-    console.log('[Whiteboard useEffect] Running. Deps:', { width, height, brushSize, brushColor, isDrawingMode, handleUndo: typeof handleUndo, historyLength: history.length });
-    
-    if (!canvasElRef.current) { 
-      console.log(`[Whiteboard useEffect] Bailing out. canvasElRef.current is falsy.`);
-      return;
-    }
-
-    console.log('[Whiteboard useEffect] Proceeding to create canvas. fabricCanvasRef.current BEFORE new canvas:', fabricCanvasRef.current);
-    const canvas = new fabric.Canvas(canvasElRef.current, {
-      width,
-      height,
-      backgroundColor: '#ffffff',
-      isDrawingMode: isDrawingMode 
-    }) as FabricCanvas;
-    console.log('[Whiteboard useEffect] Local canvas instance created.');
-
-    // Configure the local canvas instance
-    canvas.isDrawingMode = isDrawingMode;
-    canvas.freeDrawingBrush = configureBrush(canvas, brushSize, brushColor);
-    canvas.renderOnAddRemove = true;
-    canvas.preserveObjectStacking = true;
-
-    // Define event handlers that close over this 'canvas' instance
-    const handleMouseDown = (e: any) => {
-      console.log('[Whiteboard mouse:down] Mouse down event:', e);
-      if (canvas.isDrawingMode) { // Use local 'canvas'
-        const objects = canvas.getObjects(); // Use local 'canvas'
-        const existingSelection = objects.find(obj => 
-          obj instanceof fabric.Rect && 
-          (obj as any).data?.type === 'selection-rect'
-        );
-        if (existingSelection) {
-          canvas.remove(existingSelection); // Use local 'canvas'
-          canvas.renderAll(); // Use local 'canvas'
-        }
-        setStickerButtonPosition(null);
-      }
-    };
-
-    const recordState = () => {
-      console.log('[Whiteboard recordState] Recording state.');
-      const currentCanvasRef = fabricCanvasRef.current; // Use the ref here
-      if (!currentCanvasRef) {
-        console.log('[Whiteboard recordState] Canvas ref is null, cannot record state.');
-        return;
-      }
-      const objects = currentCanvasRef.getObjects();
-      console.log('[Whiteboard recordState] Current objects:', objects.length);
-      const currentState: DrawingState = {
-        canvasState: JSON.stringify(currentCanvasRef.toJSON()),
-        timestamp: Date.now()
-      };
-      setHistory(prev => {
-        const newHistory = [...prev, currentState];
-        if (newHistory.length > 20) {
-          newHistory.shift();
-        }
-        return newHistory;
-      });
-    };
-
-    const handlePathCreated = (e: any) => {
-      console.log('[Whiteboard path:created] Path created:', e.path);
-      requestAnimationFrame(recordState); // recordState will use the ref
-    };
-
-    const handleMouseUp = () => {
-      console.log('[Whiteboard mouse:up] Mouse up event.');
-      // Use local 'canvas' if logic depends on the instance from this effect run
-      if (canvas.isDrawingMode) { 
-        console.log('[Whiteboard mouse:up] Mouse up in drawing mode (local canvas context)');
-      }
-    };
-
-    // Attach listeners to the local 'canvas'
-    canvas.on('mouse:down', handleMouseDown);
-    canvas.on('path:created', handlePathCreated);
-    canvas.on('mouse:up', handleMouseUp);
-    console.log('[Whiteboard useEffect] Event listeners attached to local canvas.');
-
-    // Now assign to the ref
-    fabricCanvasRef.current = canvas;
-    console.log('[Whiteboard useEffect] fabricCanvasRef.current AFTER new canvas assignment:', fabricCanvasRef.current);
-
-    // Record initial state (uses the local canvas for toJSON)
-    const initialState: DrawingState = {
-      canvasState: JSON.stringify(canvas.toJSON()), // Use local canvas for initial JSON
+    console.log('[Whiteboard recordState] Recording state. Objects:', currentCanvas.getObjects().length);
+    const currentState: DrawingState = {
+      canvasState: JSON.stringify(currentCanvas.toJSON()),
       timestamp: Date.now()
     };
-    setHistory([initialState]); 
-    console.log('[Whiteboard useEffect] Initial history set/reset. history.length is now 1.');
+    setHistory(prev => {
+      const newHistory = [...prev, currentState].slice(-20); 
+      return newHistory;
+    });
+  }, [fabricCanvasRef, setHistory]); // Dependencies: ref and history setter (both stable or semi-stable)
 
-    // 添加键盘快捷键
-    const handleKeyboard = (e: KeyboardEvent) => {
-      console.log('[Whiteboard handleKeyboard] Keydown event:', e.key, 'Ctrl:', e.ctrlKey);
-      if (e.ctrlKey && e.key === 'z') {
-        console.log('[Whiteboard handleKeyboard] Ctrl+Z detected, calling handleUndo.');
-        handleUndo();
-      }
-    };
-    window.addEventListener('keydown', handleKeyboard);
-
-    return () => {
-      console.log('[Whiteboard useEffect Cleanup] Cleaning up canvas and listeners.');
-      window.removeEventListener('keydown', handleKeyboard);
-      const canvasToCleanup = fabricCanvasRef.current; // Capture ref for cleanup closure
-      if (canvasToCleanup) {
-        console.log('[Whiteboard useEffect Cleanup] Disposing canvas:', canvasToCleanup);
-        // Ensure these are the same handler instances if they were defined in this scope
-        canvasToCleanup.off('path:created', handlePathCreated); 
-        canvasToCleanup.off('mouse:down', handleMouseDown);
-        canvasToCleanup.off('mouse:up', handleMouseUp);
-        canvasToCleanup.dispose();
-        fabricCanvasRef.current = null; // Set ref to null after disposing
-        console.log('[Whiteboard useEffect Cleanup] Canvas disposed, ref set to null.');
-      }
-    };
-  }, [width, height, brushSize, brushColor, isDrawingMode, handleUndo, history.length]);
-
-  // 处理画笔大小变化
-  const handleBrushSizeChange = useCallback((newSize: number) => {
-    console.log('[Whiteboard handleBrushSizeChange] New size:', newSize);
-    setBrushSize(newSize);
-    const canvas = fabricCanvasRef.current;
-    if (canvas?.freeDrawingBrush) {
-      canvas.freeDrawingBrush.width = newSize;
+  // Callback to handle the undo action
+  const handleUndo = useCallback(() => {
+    const currentCanvas = fabricCanvasRef.current;
+    if (!currentCanvas) {
+      console.warn('[Whiteboard handleUndo] Canvas ref is null, cannot undo.');
+      return;
     }
-  }, []);
 
-  // 处理右键点击事件
-  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    setHistory(prevHistory => {
+      console.log('[Whiteboard handleUndo] Attempting undo. History length:', prevHistory.length);
+      if (prevHistory.length <= 1) { // Need at least one state to revert to
+        console.log('[Whiteboard handleUndo] No more states to undo or only initial state left.');
+        return prevHistory; // Return current history if no undo is possible
+      }
+
+      try {
+        const prevState = prevHistory[prevHistory.length - 2]; // Get the state before the last one
+        console.log('[Whiteboard handleUndo] Reverting to state from timestamp:', prevState.timestamp);
+        currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
+          currentCanvas.renderAll();
+          // Ensure canvas properties like brush and drawing mode are reapplied after loadFromJSON
+          // This is important as loadFromJSON might reset some canvas settings.
+          currentCanvas.isDrawingMode = initialIsDrawingMode; 
+          currentCanvas.freeDrawingBrush = configureBrush(currentCanvas, brushSize, brushColor);
+          console.log('[Whiteboard handleUndo] Canvas loaded from previous state.');
+        });
+        return prevHistory.slice(0, -1); // Return new history array with the last state removed
+      } catch (error) {
+        console.error('[Whiteboard handleUndo] Failed to undo:', error);
+        return prevHistory; // Return current history in case of an error
+      }
+    });
+  }, [setHistory, fabricCanvasRef, brushSize, brushColor, initialIsDrawingMode]); // Removed 'history' from deps
+
+  // --- Effects --- 
+
+  // Effect for initializing and managing the Fabric canvas instance and its direct properties/event listeners
+  // This effect handles canvas creation, updates to drawing mode, brush, and attaches core event listeners.
+  useEffect(() => {
+    console.log('[Whiteboard CanvasLifecycle useEffect] Running. Deps:', { width, height, initialIsDrawingMode, brushSize, brushColor });
+
+    if (!canvasElRef.current) {
+      console.warn('[Whiteboard CanvasLifecycle useEffect] canvasElRef is null. Bailing out.');
+      return;
+    }
+
+    let canvasInstance = fabricCanvasRef.current;
+
+    // If canvas doesn't exist, or width/height changed, create a new one
+    // This ensures the canvas is responsive to dimension props.
+    if (!canvasInstance || canvasInstance.getWidth() !== width || canvasInstance.getHeight() !== height) {
+      if (canvasInstance) {
+        console.log('[Whiteboard CanvasLifecycle useEffect] Disposing existing canvas due to dimension change or recreation.');
+        canvasInstance.dispose(); // Dispose old instance before creating new
+      }
+      console.log('[Whiteboard CanvasLifecycle useEffect] Creating new Fabric canvas.');
+      canvasInstance = new fabric.Canvas(canvasElRef.current, {
+        width,
+        height,
+        backgroundColor: '#ffffff', // Default background
+        isDrawingMode: initialIsDrawingMode, // Set initial drawing mode
+      }) as FabricCanvas;
+      fabricCanvasRef.current = canvasInstance; // Store new instance in ref
+      console.log('[Whiteboard CanvasLifecycle useEffect] New canvas created and assigned to ref.');
+    } else {
+      console.log('[Whiteboard CanvasLifecycle useEffect] Using existing canvas instance.');
+    }
+
+    // Apply/update canvas properties whenever dependencies change
+    console.log('[Whiteboard CanvasLifecycle useEffect] Applying properties. DrawingMode:', initialIsDrawingMode, 'BrushSize:', brushSize);
+    canvasInstance.isDrawingMode = initialIsDrawingMode;
+    canvasInstance.freeDrawingBrush = configureBrush(canvasInstance, brushSize, brushColor);
+    canvasInstance.renderOnAddRemove = true; // Important for Fabric.js behavior
+    canvasInstance.preserveObjectStacking = true; // Maintains object layering
+
+    // Define event handlers (local to this effect, will be re-attached if effect re-runs)
+    // These handlers use the 'canvasInstance' from this effect's closure.
+    const handleMouseDownLocal = (e: fabric.TEvent) => { // Changed IEvent to TEvent
+      console.log('[Whiteboard mouse:down] Event:', e);
+      if (fabricCanvasRef.current?.isDrawingMode) {
+        setStickerButtonPosition(null); // Hide sticker button when drawing starts
+      }
+    };
+
+    const handlePathCreatedLocal = (e: fabric.TEvent & { path: fabric.Path }) => { // Changed IEvent to TEvent
+      console.log('[Whiteboard path:created] Path created:', e.path);
+      requestAnimationFrame(recordState); // recordState is a stable useCallback
+    };
+
+    const handleMouseUpLocal = (e: fabric.TEvent) => { // Changed IEvent to TEvent
+      console.log('[Whiteboard mouse:up] Event:', e);
+      // Future logic for mouse up if needed
+    };
+
+    // Keyboard listener for shortcuts like Ctrl+Z for undo
+    const handleKeyboardLocal = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault(); // Prevent browser's default undo action
+        handleUndo(); // handleUndo is now a stable useCallback
+      }
+    };
+
+    // Attach event listeners to the current canvas instance and window
+    console.log('[Whiteboard CanvasLifecycle useEffect] Attaching event listeners.');
+    canvasInstance.on('mouse:down', handleMouseDownLocal);
+    canvasInstance.on('path:created', handlePathCreatedLocal);
+    canvasInstance.on('mouse:up', handleMouseUpLocal);
+    window.addEventListener('keydown', handleKeyboardLocal);
+
+    // Cleanup function for this effect: remove listeners
+    return () => {
+      console.log('[Whiteboard CanvasLifecycle useEffect Cleanup] Cleaning up listeners.');
+      window.removeEventListener('keydown', handleKeyboardLocal);
+      // Check if canvasInstance is still valid and same as ref before detaching listeners.
+      // This ensures we're cleaning up listeners from the correct instance.
+      if (canvasInstance && fabricCanvasRef.current === canvasInstance) {
+        console.log('[Whiteboard CanvasLifecycle useEffect Cleanup] Detaching listeners from canvas:', canvasInstance);
+        canvasInstance.off('mouse:down', handleMouseDownLocal);
+        canvasInstance.off('path:created', handlePathCreatedLocal);
+        canvasInstance.off('mouse:up', handleMouseUpLocal);
+      }
+      // Note: Canvas disposal itself is handled if width/height change (at the start of this effect)
+      // or on component unmount (in a separate effect).
+    };
+  }, [width, height, initialIsDrawingMode, brushSize, brushColor, handleUndo, recordState]); // Dependencies that manage canvas and its core behavior
+
+  // Effect for setting the initial history, runs once after canvas is ready and history is empty
+  useEffect(() => {
+    // Only run if canvas is available and history hasn't been initialized yet.
+    if (fabricCanvasRef.current && history.length === 0) {
+      console.log('[Whiteboard InitialHistory useEffect] Setting initial history state.');
+      const initialState: DrawingState = {
+        canvasState: JSON.stringify(fabricCanvasRef.current.toJSON()), // Get initial state from canvas
+        timestamp: Date.now()
+      };
+      setHistory([initialState]); // Initialize history with the current canvas state
+      console.log('[Whiteboard InitialHistory useEffect] Initial history state set.');
+    }
+  }, [fabricCanvasRef.current, history.length]); // Runs when canvas ref changes or history length becomes 0 (e.g. after a clear)
+
+  // Effect for component unmount: ensure canvas is disposed to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (fabricCanvasRef.current) {
+        console.log('[Whiteboard Unmount Cleanup] Disposing canvas on component unmount.');
+        fabricCanvasRef.current.dispose();
+        fabricCanvasRef.current = null;
+      }
+    };
+  }, []); // Empty dependency array means this runs only on mount and unmount
+
+  // Handler for context menu (right-click)
+  const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     console.log('[Whiteboard handleContextMenu] Context menu event triggered at:', event.clientX, event.clientY);
     event.preventDefault();
     
@@ -413,7 +419,14 @@ const Whiteboard = ({
     <div className="whiteboard-wrapper">
       <Toolbar 
         brushSize={brushSize}
-        onBrushSizeChange={handleBrushSizeChange}
+        onBrushSizeChange={(newSize: number) => {
+          console.log('[Whiteboard handleBrushSizeChange] New size:', newSize);
+          setBrushSize(newSize);
+          const canvas = fabricCanvasRef.current;
+          if (canvas?.freeDrawingBrush) {
+            canvas.freeDrawingBrush.width = newSize;
+          }
+        }}
       />
       <div 
         className="whiteboard-container"
