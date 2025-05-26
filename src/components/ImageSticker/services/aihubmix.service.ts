@@ -1,4 +1,3 @@
-import axios from 'axios';
 // 辅助函数：将 File 对象转换为 Base64 字符串
 // const fileToBase64 = (file: File): Promise<string> => {
 //     return new Promise((resolve, reject) => {

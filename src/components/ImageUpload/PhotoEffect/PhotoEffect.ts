@@ -1,4 +1,5 @@
 import * as fabric from 'fabric';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { PhotoStyle, PhotoAnimation, PhotoEffectOptions } from './photo.types';
 
 export class PhotoEffect {
