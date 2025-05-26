@@ -97,7 +97,7 @@ const Whiteboard = ({
 
   // 初始化画布
   useEffect(() => {
-    console.log('[Whiteboard useEffect] Running. Deps:', { width, height, brushSize, handleUndo: typeof handleUndo, historyLength: history.length });
+    console.log('[Whiteboard useEffect] Running. Deps:', { width, height, brushSize, handleUndo: typeof handleUndo });
     
     if (!canvasElRef.current || history.length > 0) return;
 
@@ -205,7 +205,7 @@ const Whiteboard = ({
         fabricCanvasRef.current = null;
       }
     };
-  }, [width, height, brushSize, handleUndo, history.length]);
+  }, [width, height, brushSize, handleUndo]);
 
   // 处理画笔大小变化
   const handleBrushSizeChange = useCallback((newSize: number) => {
