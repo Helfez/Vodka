@@ -101,69 +101,58 @@ const Whiteboard = ({
 
   // 初始化画布
   useEffect(() => {
-    console.log('[Whiteboard useEffect] Running. Deps:', { width, height, brushSize, brushColor, isDrawingMode, handleUndo: typeof handleUndo });
+    console.log('[Whiteboard useEffect] Running. Deps:', { width, height, brushSize, brushColor, isDrawingMode, handleUndo: typeof handleUndo, historyLength: history.length });
     
-    if (!canvasElRef.current || history.length > 0) return;
+    if (!canvasElRef.current) { 
+      console.log(`[Whiteboard useEffect] Bailing out. canvasElRef.current is falsy.`);
+      return;
+    }
 
+    console.log('[Whiteboard useEffect] Proceeding to create canvas. fabricCanvasRef.current BEFORE new canvas:', fabricCanvasRef.current);
     const canvas = new fabric.Canvas(canvasElRef.current, {
       width,
       height,
       backgroundColor: '#ffffff',
-      isDrawingMode: isDrawingMode
+      isDrawingMode: isDrawingMode 
     }) as FabricCanvas;
+    console.log('[Whiteboard useEffect] Local canvas instance created.');
 
-    console.log('[Whiteboard useEffect] Fabric canvas initialized:', fabricCanvasRef.current);
-
-    // 记录初始状态
-    const initialState: DrawingState = {
-      canvasState: JSON.stringify(canvas.toJSON()),
-      timestamp: Date.now()
-    };
-    setHistory([initialState]);
-
-    // 设置为绘画模式
+    // Configure the local canvas instance
     canvas.isDrawingMode = isDrawingMode;
     canvas.freeDrawingBrush = configureBrush(canvas, brushSize, brushColor);
-    
-    // 设置画布属性
     canvas.renderOnAddRemove = true;
     canvas.preserveObjectStacking = true;
 
-    // 监听鼠标按下事件，当用户开始画画时清除选中状态
+    // Define event handlers that close over this 'canvas' instance
     const handleMouseDown = (e: any) => {
       console.log('[Whiteboard mouse:down] Mouse down event:', e);
-      if (canvas.isDrawingMode) {
-        const objects = canvas.getObjects();
+      if (canvas.isDrawingMode) { // Use local 'canvas'
+        const objects = canvas.getObjects(); // Use local 'canvas'
         const existingSelection = objects.find(obj => 
           obj instanceof fabric.Rect && 
           (obj as any).data?.type === 'selection-rect'
         );
         if (existingSelection) {
-          canvas.remove(existingSelection);
-          canvas.renderAll();
+          canvas.remove(existingSelection); // Use local 'canvas'
+          canvas.renderAll(); // Use local 'canvas'
         }
         setStickerButtonPosition(null);
       }
     };
 
-    canvas.on('mouse:down', handleMouseDown);
-
-    fabricCanvasRef.current = canvas;
-
-    // 记录画布状态的函数
     const recordState = () => {
       console.log('[Whiteboard recordState] Recording state.');
-      const currentCanvas = fabricCanvasRef.current;
-      if (!currentCanvas) return;
-      
-      const objects = currentCanvas.getObjects();
+      const currentCanvasRef = fabricCanvasRef.current; // Use the ref here
+      if (!currentCanvasRef) {
+        console.log('[Whiteboard recordState] Canvas ref is null, cannot record state.');
+        return;
+      }
+      const objects = currentCanvasRef.getObjects();
       console.log('[Whiteboard recordState] Current objects:', objects.length);
-
       const currentState: DrawingState = {
-        canvasState: JSON.stringify(currentCanvas.toJSON()),
+        canvasState: JSON.stringify(currentCanvasRef.toJSON()),
         timestamp: Date.now()
       };
-
       setHistory(prev => {
         const newHistory = [...prev, currentState];
         if (newHistory.length > 20) {
@@ -173,23 +162,36 @@ const Whiteboard = ({
       });
     };
 
-    // 监听绘画事件
     const handlePathCreated = (e: any) => {
       console.log('[Whiteboard path:created] Path created:', e.path);
-      requestAnimationFrame(recordState);
+      requestAnimationFrame(recordState); // recordState will use the ref
     };
 
     const handleMouseUp = () => {
       console.log('[Whiteboard mouse:up] Mouse up event.');
-      if (fabricCanvasRef.current?.isDrawingMode) {
-        console.log('[Whiteboard mouse:up] Mouse up in drawing mode');
+      // Use local 'canvas' if logic depends on the instance from this effect run
+      if (canvas.isDrawingMode) { 
+        console.log('[Whiteboard mouse:up] Mouse up in drawing mode (local canvas context)');
       }
     };
 
-    if (fabricCanvasRef.current) {
-      fabricCanvasRef.current.on('path:created', handlePathCreated);
-      fabricCanvasRef.current.on('mouse:up', handleMouseUp);
-    }
+    // Attach listeners to the local 'canvas'
+    canvas.on('mouse:down', handleMouseDown);
+    canvas.on('path:created', handlePathCreated);
+    canvas.on('mouse:up', handleMouseUp);
+    console.log('[Whiteboard useEffect] Event listeners attached to local canvas.');
+
+    // Now assign to the ref
+    fabricCanvasRef.current = canvas;
+    console.log('[Whiteboard useEffect] fabricCanvasRef.current AFTER new canvas assignment:', fabricCanvasRef.current);
+
+    // Record initial state (uses the local canvas for toJSON)
+    const initialState: DrawingState = {
+      canvasState: JSON.stringify(canvas.toJSON()), // Use local canvas for initial JSON
+      timestamp: Date.now()
+    };
+    setHistory([initialState]); 
+    console.log('[Whiteboard useEffect] Initial history set/reset. history.length is now 1.');
 
     // 添加键盘快捷键
     const handleKeyboard = (e: KeyboardEvent) => {
@@ -204,13 +206,15 @@ const Whiteboard = ({
     return () => {
       console.log('[Whiteboard useEffect Cleanup] Cleaning up canvas and listeners.');
       window.removeEventListener('keydown', handleKeyboard);
-      if (fabricCanvasRef.current) {
-        console.log('[Whiteboard useEffect Cleanup] Disposing canvas:', fabricCanvasRef.current);
-        fabricCanvasRef.current.off('path:created', handlePathCreated);
-        fabricCanvasRef.current.off('mouse:down', handleMouseDown);
-        fabricCanvasRef.current.off('mouse:up', handleMouseUp);
-        fabricCanvasRef.current.dispose();
-        fabricCanvasRef.current = null;
+      const canvasToCleanup = fabricCanvasRef.current; // Capture ref for cleanup closure
+      if (canvasToCleanup) {
+        console.log('[Whiteboard useEffect Cleanup] Disposing canvas:', canvasToCleanup);
+        // Ensure these are the same handler instances if they were defined in this scope
+        canvasToCleanup.off('path:created', handlePathCreated); 
+        canvasToCleanup.off('mouse:down', handleMouseDown);
+        canvasToCleanup.off('mouse:up', handleMouseUp);
+        canvasToCleanup.dispose();
+        fabricCanvasRef.current = null; // Set ref to null after disposing
         console.log('[Whiteboard useEffect Cleanup] Canvas disposed, ref set to null.');
       }
     };
