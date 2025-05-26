@@ -30,6 +30,7 @@ interface WhiteboardProps {
 
 // 配置画笔函数
 const configureBrush = (canvas: FabricCanvas, size: number) => {
+  console.log('[Whiteboard configureBrush] Configuring brush with size:', size);
   const brush = new fabric.PencilBrush(canvas);
   brush.width = size;
   brush.color = '#000000';
@@ -44,6 +45,7 @@ const Whiteboard = ({
   width = 800, 
   height = 600 
 }: WhiteboardProps) => {
+  console.log('[Whiteboard] Component rendered/re-rendered');
   // 浮动菜单状态
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [clickPosition, setClickPosition] = useState<{ x: number; y: number } | null>(null);
@@ -57,11 +59,10 @@ const Whiteboard = ({
   
   // 撤销功能
   const handleUndo = useCallback(() => {
-    console.log('Trying to undo...');
-    console.log('History length:', history.length);
+    console.log('[Whiteboard handleUndo] Undo called. History length:', history.length);
     
     if (history.length <= 1 || !fabricCanvasRef.current) {
-      console.log('Cannot undo: no history or no canvas');
+      console.log('[Whiteboard handleUndo] Cannot undo: no history or no canvas');
       return;
     }
 
@@ -90,12 +91,14 @@ const Whiteboard = ({
 
       setHistory(prev => prev.slice(0, -1));
     } catch (error) {
-      console.error('Failed to undo:', error);
+      console.error('[Whiteboard handleUndo] Failed to undo:', error);
     }
   }, [history, brushSize]);
 
   // 初始化画布
   useEffect(() => {
+    console.log('[Whiteboard useEffect] Running. Deps:', { width, height, brushSize, handleUndo: typeof handleUndo, historyLength: history.length });
+    
     if (!canvasElRef.current || history.length > 0) return;
 
     const canvas = new fabric.Canvas(canvasElRef.current, {
@@ -104,6 +107,8 @@ const Whiteboard = ({
       backgroundColor: '#ffffff',
       isDrawingMode: true
     }) as FabricCanvas;
+
+    console.log('[Whiteboard useEffect] Fabric canvas initialized:', fabricCanvasRef.current);
 
     // 记录初始状态
     const initialState: DrawingState = {
@@ -122,6 +127,7 @@ const Whiteboard = ({
 
     // 监听鼠标按下事件，当用户开始画画时清除选中状态
     canvas.on('mouse:down', (e) => {
+      console.log('[Whiteboard mouse:down] Mouse down event:', e);
       if (canvas.isDrawingMode) {
         const objects = canvas.getObjects();
         const existingSelection = objects.find(obj => 
@@ -140,12 +146,12 @@ const Whiteboard = ({
 
     // 记录画布状态的函数
     const recordState = () => {
+      console.log('[Whiteboard recordState] Recording state.');
       const currentCanvas = fabricCanvasRef.current;
       if (!currentCanvas) return;
       
-      console.log('Recording state...');
       const objects = currentCanvas.getObjects();
-      console.log('Current objects:', objects.length);
+      console.log('[Whiteboard recordState] Current objects:', objects.length);
 
       const currentState: DrawingState = {
         canvasState: JSON.stringify(currentCanvas.toJSON()),
@@ -163,13 +169,14 @@ const Whiteboard = ({
 
     // 监听绘画事件
     const handlePathCreated = (e: any) => {
-      console.log('Path created');
+      console.log('[Whiteboard path:created] Path created:', e.path);
       requestAnimationFrame(recordState);
     };
 
     const handleMouseUp = () => {
+      console.log('[Whiteboard mouse:up] Mouse up event.');
       if (fabricCanvasRef.current?.isDrawingMode) {
-        console.log('Mouse up in drawing mode');
+        console.log('[Whiteboard mouse:up] Mouse up in drawing mode');
       }
     };
 
@@ -180,13 +187,16 @@ const Whiteboard = ({
 
     // 添加键盘快捷键
     const handleKeyboard = (e: KeyboardEvent) => {
+      console.log('[Whiteboard handleKeyboard] Keydown event:', e.key, 'Ctrl:', e.ctrlKey);
       if (e.ctrlKey && e.key === 'z') {
+        console.log('[Whiteboard handleKeyboard] Ctrl+Z detected, calling handleUndo.');
         handleUndo();
       }
     };
     window.addEventListener('keydown', handleKeyboard);
 
     return () => {
+      console.log('[Whiteboard useEffect Cleanup] Cleaning up canvas and listeners.');
       window.removeEventListener('keydown', handleKeyboard);
       if (fabricCanvasRef.current) {
         fabricCanvasRef.current.off('mouse:up', handleMouseUp);
@@ -199,6 +209,7 @@ const Whiteboard = ({
 
   // 处理画笔大小变化
   const handleBrushSizeChange = useCallback((newSize: number) => {
+    console.log('[Whiteboard handleBrushSizeChange] New size:', newSize);
     setBrushSize(newSize);
     const canvas = fabricCanvasRef.current;
     if (canvas?.freeDrawingBrush) {
@@ -208,7 +219,7 @@ const Whiteboard = ({
 
   // 处理右键点击事件
   const handleContextMenu = useCallback((event: React.MouseEvent) => {
-    // 阻止默认的右键菜单
+    console.log('[Whiteboard handleContextMenu] Context menu event triggered at:', event.clientX, event.clientY);
     event.preventDefault();
     
     if (!fabricCanvasRef.current) return;
@@ -282,18 +293,24 @@ const Whiteboard = ({
 
   // 处理贴纸转换
   const handleStickerConvert = useCallback(() => {
+    console.log('[Whiteboard handleStickerConvert] Sticker convert called.');
     if (!stickerButtonPosition) return;
-    console.log('开始转换贴纸...');
+    console.log('[Whiteboard handleStickerConvert] 开始转换贴纸...');
     // 贴纸转换逻辑已在FloatingButton组件中实现
     // 这里不需要做任何操作，因为FloatingButton组件会处理转换过程
     // 并在完成后自动关闭
   }, [stickerButtonPosition]);
 
   // 处理图片上传
-  const handleImageProcessed = useCallback((processedImage: ProcessedImage) => {
-    if (!fabricCanvasRef.current || !clickPosition) return;
+  const handleImageProcessed = useCallback(async (processedImage: ProcessedImage) => {
+    console.log('[Whiteboard handleImageProcessed] Image processed. Dimensions:', processedImage.width, 'x', processedImage.height);
+    if (!fabricCanvasRef.current || !clickPosition) {
+        console.error('[Whiteboard handleImageProcessed] Canvas or clickPosition not available.');
+        return;
+    }
 
     const canvas = fabricCanvasRef.current;
+    
     const img = new Image();
     
     img.onload = () => {
@@ -350,10 +367,7 @@ const Whiteboard = ({
         });
 
       } catch (error: any) {
-        console.error('照片效果应用失败:', {
-          message: error?.message || '未知错误',
-          stack: error?.stack
-        });
+        console.error('[Whiteboard handleImageProcessed] Error applying photo effect or adding image to canvas:', error);
       } finally {
         canvas.renderAll();
       }
