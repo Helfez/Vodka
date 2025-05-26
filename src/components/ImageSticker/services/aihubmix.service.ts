@@ -1,14 +1,13 @@
-import * as fabric from 'fabric';
-
+import axios from 'axios';
 // 辅助函数：将 File 对象转换为 Base64 字符串
-const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-    });
-};
+// const fileToBase64 = (file: File): Promise<string> => {
+//     return new Promise((resolve, reject) => {
+//         const reader = new FileReader();
+//         reader.readAsDataURL(file);
+//         reader.onload = () => resolve(reader.result as string);
+//         reader.onerror = error => reject(error);
+//     });
+// };
 
 export class AihubmixService {
     private static instance: AihubmixService;

@@ -7,7 +7,6 @@ import FloatingMenu from './FloatingMenu/FloatingMenu';
 import ImageUploader from './ImageUpload/ImageUploader';
 import { ProcessedImage } from './ImageUpload/ImageProcessor';
 import { PhotoEffect } from './ImageUpload/PhotoEffect/PhotoEffect';
-import { ImageStickerProvider } from './ImageSticker/context/ImageStickerContext';
 import { FloatingButton } from './ImageSticker/components/FloatingButton';
 import { FloatingButtonPosition } from './ImageSticker/services/types';
 
@@ -196,7 +195,7 @@ const Whiteboard = ({
         fabricCanvasRef.current = null;
       }
     };
-  }, [width, height]);
+  }, [width, height, brushSize, handleUndo, history.length]);
 
   // 处理画笔大小变化
   const handleBrushSizeChange = useCallback((newSize: number) => {

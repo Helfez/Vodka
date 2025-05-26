@@ -1,5 +1,5 @@
 import * as fabric from 'fabric';
-import { PhotoStyle, PhotoAnimation, PhotoEffectOptions } from './photo.types';
+import type { PhotoStyle, PhotoAnimation, PhotoEffectOptions } from './photo.types';
 
 export class PhotoEffect {
   private static readonly DEFAULT_OPTIONS: PhotoEffectOptions = {
