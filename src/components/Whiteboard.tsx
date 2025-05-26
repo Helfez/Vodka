@@ -10,19 +10,19 @@ import { PhotoEffect } from './ImageUpload/PhotoEffect/PhotoEffect';
 import { FloatingButton } from './ImageSticker/components/FloatingButton';
 import { FloatingButtonPosition } from './ImageSticker/services/types';
 
-type FabricObject = fabric.Object & {
-  set(options: Record<string, any>): fabric.Object;
-};
-
-type FabricCanvas = fabric.Canvas & {
+// Type alias for Fabric.js Canvas instance with custom properties if any
+// (Currently, freeDrawingBrush is a standard property but explicitly typed for clarity)
+interface FabricCanvas extends fabric.Canvas {
   freeDrawingBrush?: fabric.PencilBrush;
-};
-
-interface DrawingState {
-  canvasState: string;
-  timestamp: number;
 }
 
+// Interface for storing a snapshot of the canvas state for history
+interface DrawingState {
+  canvasState: string; // JSON string representation of canvas objects
+  timestamp: number;   // Timestamp of when the state was saved
+}
+
+// Props for the Whiteboard component
 interface WhiteboardProps {
   width?: number;
   height?: number;
@@ -223,7 +223,7 @@ const Whiteboard = ({
       setHistory([initialState]); // Initialize history with the current canvas state
       console.log('[Whiteboard InitialHistory useEffect] Initial history state set.');
     }
-  }, [fabricCanvasRef.current, history.length]); // Runs when canvas ref changes or history length becomes 0 (e.g. after a clear)
+  }, [fabricCanvasRef, history.length]); // Runs when canvas ref object changes or history length changes
 
   // Effect for component unmount: ensure canvas is disposed to prevent memory leaks
   useEffect(() => {
