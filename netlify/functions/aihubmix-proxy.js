@@ -2,6 +2,25 @@ const axios = require('axios');
 const FormData = require('form-data');
 const { Buffer } = require('buffer'); // 引入 Buffer
 
+// Simplified handler for testing POST requests
+exports.handler = async function(event, context) {
+    console.log('[TEST HANDLER] Received event:', JSON.stringify(event, null, 2)); // Log the event for debugging
+    if (event.httpMethod === 'POST') {
+        return {
+            statusCode: 200,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: "POST request received successfully by test proxy handler!" })
+        };
+    }
+    // For any other method, like GET from browser test
+    return {
+        statusCode: 405,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "Method Not Allowed. This test handler primarily expects POST." })
+    };
+};
+
+/* Original Handler - Commented out for testing
 exports.handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
@@ -51,23 +70,23 @@ exports.handler = async function(event, context) {
                 body: JSON.stringify({ error: 'Aihubmix API 响应结构异常。', details: response.data }),
             };
         }
-
     } catch (error) {
-        console.error('aihubmix-proxy 函数出错:', error.message);
+        console.error('aihubmix-proxy 云函数内部错误:', error.message);
+        console.error('错误详情:', error.stack);
+        // 如果错误是 axios 错误，尝试记录更多信息
         if (error.response) {
-            console.error('Aihubmix API 错误响应状态:', error.response.status);
-            console.error('Aihubmix API 错误响应数据:', error.response.data);
-            return {
-                statusCode: error.response.status || 500,
-                body: JSON.stringify({ 
-                    error: 'Aihubmix API 请求失败。', 
-                    details: error.response.data 
-                }),
-            };
+            console.error('Axios 错误响应数据:', error.response.data);
+            console.error('Axios 错误响应状态:', error.response.status);
+            console.error('Axios 错误响应头:', error.response.headers);
+        } else if (error.request) {
+            console.error('Axios 请求已发出但无响应:', error.request);
+        } else {
+            console.error('Axios 配置错误或未知错误:', error.message);
         }
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: '代理函数内部服务器错误。', details: error.message }),
+            body: JSON.stringify({ error: '代理服务内部错误。', details: error.message }),
         };
     }
-};
+}; 
+*/
