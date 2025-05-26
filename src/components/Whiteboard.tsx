@@ -126,7 +126,7 @@ const Whiteboard = ({
     canvas.preserveObjectStacking = true;
 
     // 监听鼠标按下事件，当用户开始画画时清除选中状态
-    canvas.on('mouse:down', (e) => {
+    const handleMouseDown = (e: any) => {
       console.log('[Whiteboard mouse:down] Mouse down event:', e);
       if (canvas.isDrawingMode) {
         const objects = canvas.getObjects();
@@ -140,7 +140,9 @@ const Whiteboard = ({
         }
         setStickerButtonPosition(null);
       }
-    });
+    };
+
+    canvas.on('mouse:down', handleMouseDown);
 
     fabricCanvasRef.current = canvas;
 
@@ -199,13 +201,16 @@ const Whiteboard = ({
       console.log('[Whiteboard useEffect Cleanup] Cleaning up canvas and listeners.');
       window.removeEventListener('keydown', handleKeyboard);
       if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.off('mouse:up', handleMouseUp);
+        console.log('[Whiteboard useEffect Cleanup] Disposing canvas:', fabricCanvasRef.current);
         fabricCanvasRef.current.off('path:created', handlePathCreated);
+        fabricCanvasRef.current.off('mouse:down', handleMouseDown);
+        fabricCanvasRef.current.off('mouse:up', handleMouseUp);
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
+        console.log('[Whiteboard useEffect Cleanup] Canvas disposed, ref set to null.');
       }
     };
-  }, [width, height, brushSize, handleUndo]);
+  }, [width, height, brushSize, handleUndo, history.length]);
 
   // 处理画笔大小变化
   const handleBrushSizeChange = useCallback((newSize: number) => {
