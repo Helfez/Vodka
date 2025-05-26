@@ -1,0 +1,22 @@
+.App {
+  text-align: center;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  height: 100vh;
+}
+
+.whiteboard-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.whiteboard-container {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
