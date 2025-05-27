@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ImageServiceFactory } from '../services/image-service.factory';
+import { CloudinaryService } from '../services/CloudinaryService';
 
 interface StickerConverterProps {
   imageUrl: string;
@@ -46,18 +47,27 @@ const StickerConverter: React.FC<StickerConverterProps> = ({
       
       // 获取图像处理服务
       const imageService = ImageServiceFactory.getService('aihubmix');
+
+      // Convert data URL to File object for Cloudinary upload
+      // Assuming imageUrl is a data URL. If it's from a File input, this component should ideally receive the File object.
+      const imageFile = CloudinaryService.dataURLtoFile(imageUrl, `sticker_upload_${Date.now()}.png`);
+      console.debug('[StickerConverter] Converted imageFile:', imageFile ? { name: imageFile.name, size: imageFile.size, type: imageFile.type } : 'null');
+      if (!imageFile) {
+        throw new Error('无法将图像数据转换为文件格式以进行上传');
+      }
       
-      // 压缩图像以减小API请求大小
-      console.log('开始压缩图像...');
-      setProgress(20);
-      const compressedImage = await imageService.compressImage(imageUrl, 800, 0.7);
-      console.log('图像压缩完成, 压缩后长度:', compressedImage.length);
-      setProgress(30);
-      
+      // Upload image to Cloudinary
+      console.log('[StickerConverter] Uploading image to Cloudinary...');
+      setProgress(20); // Or adjust progress steps as needed
+      const cloudinaryUrl = await CloudinaryService.uploadImage(imageFile);
+      console.log('[StickerConverter] Image uploaded to Cloudinary:', cloudinaryUrl);
+      setProgress(50); // Or adjust progress steps
+
       // 调用服务转换贴纸
-      console.log('开始调用图像处理服务转换贴纸...');
-      const stickerUrl = await imageService.convertToSticker(compressedImage);
+      console.log('[StickerConverter] 开始调用图像处理服务转换贴纸 (using Cloudinary URL)...', cloudinaryUrl);
+      const stickerUrl = await imageService.convertToSticker(cloudinaryUrl);
       console.log('贴纸转换成功, 返回 URL 长度:', stickerUrl.length);
+      console.debug('[StickerConverter] Received sticker URL:', stickerUrl);
       console.log('贴纸 URL 前50个字符:', stickerUrl.substring(0, 50) + '...');
       
       // 完成转换
@@ -66,6 +76,7 @@ const StickerConverter: React.FC<StickerConverterProps> = ({
       onConversionComplete(stickerUrl);
     } catch (error: any) {
       console.error('贴纸转换过程出错:', error);
+      console.error('[StickerConverter] Sticker conversion error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
       
       // 提供更详细的错误信息
       let errorMessage = '转换失败，请重试';
