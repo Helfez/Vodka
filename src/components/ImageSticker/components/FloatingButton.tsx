@@ -3,17 +3,16 @@ import * as fabric from 'fabric';
 import { FloatingButtonPosition } from '../services/types';
 import { ImageServiceFactory } from '../services/image-service.factory';
 import ProcessingOverlay from './ProcessingOverlay';
-import { CloudinaryService } from '../services/CloudinaryService';
 
+/**
+ * 浮动按钮组件 - 显示在图像上方的贴纸转换按钮
+ */
 interface FloatingButtonProps {
   position: FloatingButtonPosition;
   onConvert: () => void;
   onClose: () => void;
 }
 
-/**
- * 浮动按钮组件 - 显示在图像上方的贴纸转换按钮
- */
 export const FloatingButton: React.FC<FloatingButtonProps> = ({
   position,
   onConvert,
