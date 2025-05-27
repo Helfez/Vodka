@@ -1,115 +1,103 @@
-const axios = require('axios');
+// netlify/functions/aihubmix-proxy.js
+const fetch = require('node-fetch');
 
-exports.handler = async function(event, context) {
-    console.log('[Aihubmix Proxy] Received event:', JSON.stringify(event, null, 2));
+exports.handler = async (event, context) => {
+    console.log('[aihubmix-proxy] Function invoked.');
+    console.debug('[aihubmix-proxy] Received event:', JSON.stringify(event));
+    console.debug('[aihubmix-proxy] Received headers:', JSON.stringify(event.headers));
 
     if (event.httpMethod !== 'POST') {
+        console.warn(`[aihubmix-proxy] Invalid HTTP method: ${event.httpMethod}`);
         return {
             statusCode: 405,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ error: 'Method Not Allowed. Only POST requests are accepted.' })
+            body: JSON.stringify({ error: '只允许POST方法' }),
+            headers: { 'Allow': 'POST' },
         };
     }
 
     let requestBody;
     try {
         requestBody = JSON.parse(event.body);
-    } catch (e) {
-        console.error('[Aihubmix Proxy] Error parsing request body:', e);
+    } catch (error) {
+        console.error('[aihubmix-proxy] Invalid JSON body:', error.message);
         return {
             statusCode: 400,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ error: 'Invalid JSON in request body.' })
+            body: JSON.stringify({ error: '无效的JSON请求体', details: error.message }),
         };
     }
 
     const { imageUrl } = requestBody;
-    const apiKey = process.env.REACT_APP_AIHUBMIX_API_KEY;
+    console.debug('[aihubmix-proxy] Extracted imageUrl:', imageUrl);
 
-    if (!apiKey) {
-        console.error('[Aihubmix Proxy] Aihubmix API key is not set in environment variables.');
-        return {
-            statusCode: 500,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ error: 'API key is not configured on the server.' })
-        };
-    }
-
-    if (!imageUrl) {
-        console.error('[Aihubmix Proxy] imageUrl is missing in the request body.');
+    if (!imageUrl || typeof imageUrl !== 'string' || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
+        console.error('[aihubmix-proxy] Invalid or missing imageUrl in request body:', imageUrl);
         return {
             statusCode: 400,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ error: 'Missing imageUrl in request body.' })
+            body: JSON.stringify({ error: '请求体中缺少有效的目标图像URL (imageUrl)' }),
         };
     }
 
-    try {
-        console.log(`[Aihubmix Proxy] Calling Aihubmix API with imageUrl: ${imageUrl}`);
-        
-        const payload = {
-            image_url: imageUrl, 
-            output_format: 'url' 
+    const apiKey = process.env.AIHUBMIX_API_KEY;
+    if (!apiKey) {
+        console.error('[aihubmix-proxy] AIHUBMIX_API_KEY not set in environment variables.');
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: '服务器配置错误 (API Key missing)' }),
         };
+    }
 
-        console.log('[Aihubmix Proxy] Sending payload to Aihubmix:', JSON.stringify(payload));
+    const AIHUBMIX_API_URL = 'https://api.aihubmix.com/images/remove-background/v1';
+    console.debug('[aihubmix-proxy] Aihubmix API URL:', AIHUBMIX_API_URL);
+    console.log('[aihubmix-proxy] Using AIHUBMIX_API_KEY (partial):', process.env.AIHUBMIX_API_KEY ? process.env.AIHUBMIX_API_KEY.substring(0, 4) + '...' : 'Not Set');
 
-        const response = await axios.post('https://aihubmix.com/api/v1/ai/replace-background', payload, {
+    const apiRequestBodyForAihubmix = {
+        image_url: imageUrl,
+    };
+    console.debug('[aihubmix-proxy] Sending to Aihubmix with body:', JSON.stringify(apiRequestBodyForAihubmix));
+
+    try {
+        const aihubmixResponse = await fetch(AIHUBMIX_API_URL, {
+            method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
             },
-            timeout: 30000, 
+            body: JSON.stringify(apiRequestBodyForAihubmix),
         });
+
+        const responseData = await aihubmixResponse.json();
+        console.debug('[aihubmix-proxy] Received response from Aihubmix:', JSON.stringify(responseData));
+
+        if (!aihubmixResponse.ok) {
+            console.error(`[aihubmix-proxy] Aihubmix API error: ${aihubmixResponse.status}`, responseData);
+            return {
+                statusCode: aihubmixResponse.status,
+                body: JSON.stringify({ error: 'Aihubmix API处理失败', details: responseData }),
+            };
+        }
         
-        console.log('[Aihubmix Proxy] Aihubmix API raw response status:', response.status);
-        console.log('[Aihubmix Proxy] Aihubmix API raw response data:', JSON.stringify(response.data, null, 2));
+        const processedImageUrl = responseData.data && responseData.data[0] && responseData.data[0].url;
 
-        if (response.data && response.data.data && Array.isArray(response.data.data) && response.data.data.length > 0 && response.data.data[0].url) {
+        if (!processedImageUrl) {
+            console.error('[aihubmix-proxy] Processed image URL not found in Aihubmix response:', responseData);
             return {
-                statusCode: 200,
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(response.data), 
-            };
-        } else {
-            console.error('[Aihubmix Proxy] Unexpected response structure from Aihubmix:', response.data);
-            return {
-                statusCode: 500, 
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ error: 'Aihubmix API returned an unexpected response structure.', details: response.data }),
+                statusCode: 500,
+                body: JSON.stringify({ error: '从Aihubmix API响应中未能提取处理后的图像URL', details: responseData }),
             };
         }
-    } catch (error) {
-        console.error('[Aihubmix Proxy] Error calling Aihubmix API or during processing:', error.message);
-        if (error.stack) {
-            console.error('[Aihubmix Proxy] Error stack:', error.stack);
-        }
 
-        let errorStatusCode = 500;
-        let errorBody = { error: 'Proxy encountered an internal server error.', details: error.message };
-
-        if (error.response) {
-            console.error('[Aihubmix Proxy] Axios error - Aihubmix API response status:', error.response.status);
-            console.error('[Aihubmix Proxy] Axios error - Aihubmix API response data:', JSON.stringify(error.response.data, null, 2));
-            errorStatusCode = error.response.status || 500; 
-            errorBody = {
-                error: 'Aihubmix API request failed.',
-                details: error.response.data || error.message,
-                aihubmix_status: error.response.status
-            };
-        } else if (error.request) {
-            console.error('[Aihubmix Proxy] Axios error - No response received from Aihubmix API:', error.request);
-            errorStatusCode = 504; 
-            errorBody = { error: 'No response received from Aihubmix API (Gateway Timeout).', details: error.message };
-        } else {
-            console.error('[Aihubmix Proxy] Axios or other setup error:', error.message);
-        }
-
+        console.log('[aihubmix-proxy] Successfully processed image. Returning URL:', processedImageUrl);
         return {
-            statusCode: errorStatusCode,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(errorBody),
+            statusCode: 200,
+            body: JSON.stringify({ processedImageUrl: processedImageUrl }),
+        };
+
+    } catch (error) {
+        console.error('[aihubmix-proxy] Error calling Aihubmix API (node-fetch):', error.name, error.message, error.stack);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: '调用Aihubmix API时出错', details: error.message }),
         };
     }
 };
