@@ -97,97 +97,58 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
       setError(null);
       
       // 获取图像数据
-      const imageUrl = getImageDataUrl();
-      console.debug('[FloatingButton] Initial image data URL (length):', imageUrl ? imageUrl.length : 'null');
-      if (!imageUrl) {
+      const imageDataUrl = getImageDataUrl(); 
+      console.debug('[FloatingButton] Initial image data URL (length):', imageDataUrl ? imageDataUrl.length : 'null');
+      if (!imageDataUrl) {
         throw new Error('无法获取图像数据');
       }
 
-      // Convert data URL to File object
-      const imageFile = CloudinaryService.dataURLtoFile(imageUrl, `sticker_${Date.now()}.png`);
-      console.debug('[FloatingButton] Converted imageFile:', imageFile ? { name: imageFile.name, size: imageFile.size, type: imageFile.type } : 'null');
-      if (!imageFile) {
-        throw new Error('无法将图像数据转换为文件格式');
-      }
-      
       // 设置图像为不可选中状态
       position.target.set({
         selectable: false,
         evented: false
       });
-      position.target.canvas.renderAll();
+      if (position.target.canvas) {
+          position.target.canvas.renderAll();
+      }
       
       // 开始进度更新
       const progressInterval = updateProgress();
       
       // 获取图像处理服务
-      const imageService = ImageServiceFactory.getService('aihubmix');
+      const imageService = ImageServiceFactory.getService('aihubmix'); 
       
-      // Upload image to Cloudinary
-      console.log('[FloatingButton] Uploading image to Cloudinary...');
-      setProgress(20); // Update progress for upload step
+      // 调用服务进行贴纸转换, AihubmixService.convertToSticker now expects a Base64 string.
+      console.log('[FloatingButton] Calling convertToSticker with Base64 data URL...');
+      setProgress(40); 
+      const processedStickerCloudinaryUrl = await imageService.convertToSticker(imageDataUrl);
       
-      console.log('[FloatingButton] Preparing to upload. ImageFile name:', imageFile ? imageFile.name : 'null', 'type:', imageFile ? imageFile.type : 'null');
-      const cloudinaryUploadResult = await CloudinaryService.uploadImage(imageFile);
-      console.log('[FloatingButton] CloudinaryService.uploadImage RAW RESULT:', cloudinaryUploadResult);
-      console.log('[FloatingButton] CloudinaryService.uploadImage RAW RESULT typeof:', typeof cloudinaryUploadResult);
-
-      const cloudinaryUrl = cloudinaryUploadResult; // Explicitly assign after logging
-
-      console.log('[FloatingButton] Value assigned to cloudinaryUrl after upload:', cloudinaryUrl);
-      setProgress(50); // Update progress after upload
-      
-      // 调用服务转换贴纸 (using Cloudinary URL)
-      console.log('[FloatingButton] Calling convertToSticker with Cloudinary URL:', cloudinaryUrl);
-      const stickerUrl = await imageService.convertToSticker(cloudinaryUrl);
-      console.debug('[FloatingButton] Received sticker URL:', stickerUrl);
-      
-      // 替换为贴纸
-      await replaceWithSticker(stickerUrl);
-      
-      // 清理
-      clearInterval(progressInterval);
+      console.log('[FloatingButton] Sticker conversion successful. Processed Cloudinary URL:', processedStickerCloudinaryUrl);
       setProgress(100);
+      clearInterval(progressInterval);
       
-      // 显示完成状态，然后关闭浮动按钮
-      setTimeout(() => {
-        setIsProcessing(false);
-        onClose();
-      }, 1000);
+      await replaceWithSticker(processedStickerCloudinaryUrl);
       
-    } catch (error: any) {
-      console.error('贴纸转换失败:', error);
-      
-      // 提供更友好的错误提示
-      let errorMessage = '转换失败';
-      if (error.message) {
-        if (error.message.includes('API2D服务无响应')) {
-          errorMessage = '网络连接失败，请检查网络';
-        } else if (error.message.includes('无法从响应中提取图片')) {
-          errorMessage = '图片处理失败，请尝试其他图片';
-        } else if (error.message.includes('API2D密钥')) {
-          errorMessage = 'API密钥配置错误，请联系管理员';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
-      setError(errorMessage);
+    } catch (err: any) {
+      console.error('[FloatingButton] Sticker conversion failed:', err);
+      setError(err.message || '贴纸转换失败，请稍后重试');
+      const progressInterval = setInterval(() => {}, 1000); 
+      clearInterval(progressInterval); 
+      setProgress(0); 
+    } finally {
       setIsProcessing(false);
-      
-      // 恢复图像可选中状态
-      if (position.target && position.target.canvas) {
+      if (position.target) {
         position.target.set({
           selectable: true,
           evented: true
         });
-        position.target.canvas.renderAll();
+        if (position.target.canvas) {
+            position.target.canvas.renderAll();
+        }
       }
-      
-      // 3秒后自动清除错误提示
-      setTimeout(() => {
-        setError(null);
-      }, 3000);
+      if (!error && typeof onConvert === 'function') {
+        onConvert(); 
+      }
     }
   };
   

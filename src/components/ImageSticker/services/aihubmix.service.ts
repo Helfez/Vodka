@@ -23,20 +23,30 @@ export class AihubmixService {
     }
 
     /**
-     * Calls the aihubmix-proxy to process an image (e.g., remove background) using its public URL.
-     * @param imageUrl The publicly accessible URL of the image to be processed.
-     * @returns A promise that resolves to the URL of the processed image.
+     * Calls the aihubmix-proxy to process an image (e.g., remove background) using its Base64 data.
+     * @param imageBase64 The Base64 encoded string of the image to be processed.
+     * @param prompt Optional prompt for the Aihubmix API.
+     * @returns A promise that resolves to the URL of the processed image from Cloudinary.
      */
-    public async convertToSticker(imageUrl: string): Promise<string> {
-        console.log('[AihubmixService convertToSticker] Called with image URL:', imageUrl);
+    public async convertToSticker(imageBase64: string, prompt?: string): Promise<string> {
+        console.log('[AihubmixService convertToSticker] Called with imageBase64 (first 50 chars):', imageBase64.substring(0, 50));
 
-        if (!imageUrl || typeof imageUrl !== 'string' || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
-            console.error('[AihubmixService convertToSticker] Invalid image URL provided:', imageUrl);
-            throw new Error('无效的图像URL。必须是一个有效的HTTP或HTTPS URL。');
+        if (!imageBase64 || typeof imageBase64 !== 'string') {
+            console.error('[AihubmixService convertToSticker] Invalid imageBase64 provided.');
+            throw new Error('无效的图像Base64编码。');
         }
 
-        const requestBody = { imageUrl };
-        console.debug('[AihubmixService convertToSticker] Sending to proxy with body:', JSON.stringify(requestBody));
+        // Remove potential data URI scheme prefix (e.g., "data:image/png;base64,") if present
+        const base64Data = imageBase64.startsWith('data:') ? imageBase64.split(',')[1] : imageBase64;
+
+        const requestBody: { image_base64: string; prompt?: string } = { 
+            image_base64: base64Data 
+        };
+        if (prompt) {
+            requestBody.prompt = prompt;
+        }
+
+        console.debug('[AihubmixService convertToSticker] Sending to proxy with body keys:', Object.keys(requestBody));
 
         try {
             const response = await fetch('/.netlify/functions/aihubmix-proxy', {
@@ -59,18 +69,11 @@ export class AihubmixService {
             console.log('[AihubmixService convertToSticker] Parsed JSON response from proxy:', responseData);
 
             if (responseData && responseData.processedImageUrl) {
-                let originalImageUrl = responseData.processedImageUrl;
-                console.log('[AihubmixService convertToSticker] Processed image URL from proxy:', originalImageUrl);
-
-                let finalStickerUrl = originalImageUrl;
-                if (originalImageUrl.startsWith('http://ideogram.ai/') || originalImageUrl.startsWith('https://ideogram.ai/')) {
-                    finalStickerUrl = `/.netlify/functions/image-proxy?url=${encodeURIComponent(originalImageUrl)}`;
-                    console.log('[AihubmixService convertToSticker] Proxied image URL for return (ideogram):', finalStickerUrl);
-                } else {
-                    console.log('[AihubmixService convertToSticker] Using direct URL from proxy:', originalImageUrl);
-                }
+                const processedCloudinaryUrl = responseData.processedImageUrl;
+                console.log('[AihubmixService convertToSticker] Processed image URL from proxy (Cloudinary):', processedCloudinaryUrl);
                 
-                return finalStickerUrl; 
+                // The URL from the proxy is already the final Cloudinary URL, no need for further proxying here.
+                return processedCloudinaryUrl; 
             } else {
                 console.error('[AihubmixService convertToSticker] Unexpected response structure or missing processedImageUrl from proxy:', responseData);
                 throw new Error('Unexpected response structure or missing processedImageUrl from Aihubmix proxy.');
@@ -78,7 +81,8 @@ export class AihubmixService {
         } catch (error: any) {
             console.error('[AihubmixService convertToSticker] Error in method:', error);
             const errorMessage = error.message || 'An unknown error occurred during sticker conversion.';
-            return Promise.reject(errorMessage);
+            // Ensure a Promise.reject is returned for proper error handling by the caller
+            return Promise.reject(new Error(errorMessage));
         }
     }
 
