@@ -73,7 +73,7 @@ exports.handler = async (event, context) => {
         form.append('prompt', userPrompt || "Remove the background, making it transparent. Keep the main subject clear and high quality.");
         form.append('n', n.toString());
         form.append('size', size);
-        form.append('response_format', 'b64_json');
+        // form.append('response_format', 'b64_json'); // Removed to fix 400 error
 
         const apiUrl = 'https://aihubmix.com/v1/images/edits';
 
