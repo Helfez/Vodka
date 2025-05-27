@@ -22,66 +22,62 @@ export class AihubmixService {
         return AihubmixService.instance;
     }
 
+    /**
+     * Calls the aihubmix-proxy to process an image (e.g., remove background) using its public URL.
+     * @param imageUrl The publicly accessible URL of the image to be processed.
+     * @returns A promise that resolves to the URL of the processed image.
+     */
     public async convertToSticker(imageUrl: string): Promise<string> {
-        console.log('convertToSticker 调用，图片 data URL 长度:', imageUrl.length);
+        console.log('[AihubmixService convertToSticker] Called with image URL:', imageUrl);
+
+        if (!imageUrl || typeof imageUrl !== 'string' || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
+            console.error('[AihubmixService convertToSticker] Invalid image URL provided:', imageUrl);
+            throw new Error('无效的图像URL。必须是一个有效的HTTP或HTTPS URL。');
+        }
+
+        const requestBody = { imageUrl };
+        console.debug('[AihubmixService convertToSticker] Sending to proxy with body:', JSON.stringify(requestBody));
 
         try {
-            // imageUrl 是 data URL, 例如: "data:image/png;base64,iVBORw0KGgo..."
-            // 我们需要提取 base64 部分给代理
-            const base64Data = imageUrl.split(';base64,').pop();
-            if (!base64Data) {
-                console.error('无法从 imageUrl 提取 base64 数据:', imageUrl.substring(0, 100));
-                throw new Error('无效的图像 data URL 格式。');
-            }
-            console.log('从 imageUrl 提取的 base64 数据长度:', base64Data.length);
-
-            // 为 fileName 提供一个默认值，因为我们不再有 File 对象
-            const defaultFileName = 'image.png'; 
-
             const response = await fetch('/.netlify/functions/aihubmix-proxy', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    imageData: base64Data, // 使用提取的 base64 数据
-                    fileName: defaultFileName, // 使用默认文件名
-                }),
+                body: JSON.stringify(requestBody),
             });
 
-            console.log('从 /.netlify/functions/aihubmix-proxy 获得的原始响应:', response);
+            console.log('[AihubmixService convertToSticker] Raw response from proxy:', response);
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: '无法从代理服务解析错误响应' }));
-                console.error('aihubmix-proxy 云函数错误响应:', response.status, errorData);
-                throw new Error(`Aihubmix 代理 API 请求失败，状态码 ${response.status}: ${errorData.error || errorData.message || '未知错误'}`);
+                const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response from proxy' }));
+                console.error('[AihubmixService convertToSticker] Proxy error response:', response.status, errorData);
+                throw new Error(`Aihubmix proxy API request failed with status ${response.status}: ${errorData.error || errorData.message || 'Unknown error'}`);
             }
 
             const responseData = await response.json();
-            console.log('从 aihubmix-proxy 解析后的 JSON 响应:', responseData);
+            console.log('[AihubmixService convertToSticker] Parsed JSON response from proxy:', responseData);
 
-            if (responseData && responseData.data && responseData.data[0] && responseData.data[0].url) {
-                let originalImageUrl = responseData.data[0].url;
-                console.log('从 Aihubmix 获取的原始图片 URL:', originalImageUrl);
+            if (responseData && responseData.processedImageUrl) {
+                let originalImageUrl = responseData.processedImageUrl;
+                console.log('[AihubmixService convertToSticker] Processed image URL from proxy:', originalImageUrl);
 
-                let processedImageUrl = originalImageUrl;
-                // 确保只代理 ideogram.ai 的 URL
+                let finalStickerUrl = originalImageUrl;
                 if (originalImageUrl.startsWith('http://ideogram.ai/') || originalImageUrl.startsWith('https://ideogram.ai/')) {
-                    processedImageUrl = `/.netlify/functions/image-proxy?url=${encodeURIComponent(originalImageUrl)}`;
-                    console.log('用于返回的代理图片 URL:', processedImageUrl);
+                    finalStickerUrl = `/.netlify/functions/image-proxy?url=${encodeURIComponent(originalImageUrl)}`;
+                    console.log('[AihubmixService convertToSticker] Proxied image URL for return (ideogram):', finalStickerUrl);
                 } else {
-                    console.warn('收到的 URL 不是来自 ideogram.ai，将直接使用:', originalImageUrl);
+                    console.log('[AihubmixService convertToSticker] Using direct URL from proxy:', originalImageUrl);
                 }
                 
-                return processedImageUrl; // 返回处理后的图片 URL 字符串
+                return finalStickerUrl; 
             } else {
-                console.error('通过代理从 Aihubmix API 获取的响应结构异常:', responseData);
-                throw new Error('通过代理从 Aihubmix API 获取的响应结构异常。');
+                console.error('[AihubmixService convertToSticker] Unexpected response structure or missing processedImageUrl from proxy:', responseData);
+                throw new Error('Unexpected response structure or missing processedImageUrl from Aihubmix proxy.');
             }
-        } catch (error) {
-            console.error('convertToSticker 方法出错:', error);
-            // @ts-ignore
-            const errorMessage = error.message || '抠图转换过程中发生未知错误。';
+        } catch (error: any) {
+            console.error('[AihubmixService convertToSticker] Error in method:', error);
+            const errorMessage = error.message || 'An unknown error occurred during sticker conversion.';
             return Promise.reject(errorMessage);
         }
     }

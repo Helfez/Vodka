@@ -3,6 +3,7 @@ import * as fabric from 'fabric';
 import { FloatingButtonPosition } from '../services/types';
 import { ImageServiceFactory } from '../services/image-service.factory';
 import ProcessingOverlay from './ProcessingOverlay';
+import { CloudinaryService } from '../services/CloudinaryService';
 
 interface FloatingButtonProps {
   position: FloatingButtonPosition;
@@ -97,8 +98,16 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
       
       // 获取图像数据
       const imageUrl = getImageDataUrl();
+      console.debug('[FloatingButton] Initial image data URL (length):', imageUrl ? imageUrl.length : 'null');
       if (!imageUrl) {
         throw new Error('无法获取图像数据');
+      }
+
+      // Convert data URL to File object
+      const imageFile = CloudinaryService.dataURLtoFile(imageUrl, `sticker_${Date.now()}.png`);
+      console.debug('[FloatingButton] Converted imageFile:', imageFile ? { name: imageFile.name, size: imageFile.size, type: imageFile.type } : 'null');
+      if (!imageFile) {
+        throw new Error('无法将图像数据转换为文件格式');
       }
       
       // 设置图像为不可选中状态
@@ -114,11 +123,24 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
       // 获取图像处理服务
       const imageService = ImageServiceFactory.getService('aihubmix');
       
-      // 压缩图像
-      const compressedImage = await imageService.compressImage(imageUrl, 800, 0.7);
+      // Upload image to Cloudinary
+      console.log('[FloatingButton] Uploading image to Cloudinary...');
+      setProgress(20); // Update progress for upload step
       
-      // 调用服务转换贴纸
-      const stickerUrl = await imageService.convertToSticker(compressedImage);
+      console.log('[FloatingButton] Preparing to upload. ImageFile name:', imageFile ? imageFile.name : 'null', 'type:', imageFile ? imageFile.type : 'null');
+      const cloudinaryUploadResult = await CloudinaryService.uploadImage(imageFile);
+      console.log('[FloatingButton] CloudinaryService.uploadImage RAW RESULT:', cloudinaryUploadResult);
+      console.log('[FloatingButton] CloudinaryService.uploadImage RAW RESULT typeof:', typeof cloudinaryUploadResult);
+
+      const cloudinaryUrl = cloudinaryUploadResult; // Explicitly assign after logging
+
+      console.log('[FloatingButton] Value assigned to cloudinaryUrl after upload:', cloudinaryUrl);
+      setProgress(50); // Update progress after upload
+      
+      // 调用服务转换贴纸 (using Cloudinary URL)
+      console.log('[FloatingButton] Calling convertToSticker with Cloudinary URL:', cloudinaryUrl);
+      const stickerUrl = await imageService.convertToSticker(cloudinaryUrl);
+      console.debug('[FloatingButton] Received sticker URL:', stickerUrl);
       
       // 替换为贴纸
       await replaceWithSticker(stickerUrl);
