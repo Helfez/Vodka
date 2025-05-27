@@ -1,5 +1,13 @@
-// netlify/functions/aihubmix-proxy.js
 const fetch = require('node-fetch');
+const FormData = require('form-data');
+const cloudinary = require('cloudinary').v2;
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true,
+});
 
 exports.handler = async (event, context) => {
     console.log('[aihubmix-proxy] Function invoked.');
@@ -15,25 +23,12 @@ exports.handler = async (event, context) => {
         };
     }
 
-    let requestBody;
-    try {
-        requestBody = JSON.parse(event.body);
-    } catch (error) {
-        console.error('[aihubmix-proxy] Invalid JSON body:', error.message);
+    // Check for Cloudinary config first
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+        console.error('[aihubmix-proxy] Cloudinary environment variables not fully configured.');
         return {
-            statusCode: 400,
-            body: JSON.stringify({ error: '无效的JSON请求体', details: error.message }),
-        };
-    }
-
-    const { imageUrl } = requestBody;
-    console.debug('[aihubmix-proxy] Extracted imageUrl:', imageUrl);
-
-    if (!imageUrl || typeof imageUrl !== 'string' || (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
-        console.error('[aihubmix-proxy] Invalid or missing imageUrl in request body:', imageUrl);
-        return {
-            statusCode: 400,
-            body: JSON.stringify({ error: '请求体中缺少有效的目标图像URL (imageUrl)' }),
+            statusCode: 500,
+            body: JSON.stringify({ error: 'Cloudinary configuration missing on server.' }),
         };
     }
 
@@ -46,58 +41,115 @@ exports.handler = async (event, context) => {
         };
     }
 
-    const AIHUBMIX_API_URL = 'https://api.aihubmix.com/images/remove-background/v1';
-    console.debug('[aihubmix-proxy] Aihubmix API URL:', AIHUBMIX_API_URL);
-    console.log('[aihubmix-proxy] Using AIHUBMIX_API_KEY (partial):', process.env.AIHUBMIX_API_KEY ? process.env.AIHUBMIX_API_KEY.substring(0, 4) + '...' : 'Not Set');
+    let requestBody;
+    try {
+        requestBody = JSON.parse(event.body);
+    } catch (error) {
+        console.error('[aihubmix-proxy] Invalid JSON body:', error.message);
+        return {
+            statusCode: 400,
+            body: JSON.stringify({ error: '无效的JSON请求体', details: error.message }),
+        };
+    }
 
-    const apiRequestBodyForAihubmix = {
-        image_url: imageUrl,
-    };
-    console.debug('[aihubmix-proxy] Sending to Aihubmix with body:', JSON.stringify(apiRequestBodyForAihubmix));
+    const { image_base64, prompt: userPrompt, size = "1024x1024", n = 1 } = requestBody;
+
+    if (!image_base64) {
+        console.error('[aihubmix-proxy] Missing image_base64 parameter');
+        return {
+            statusCode: 400,
+            body: JSON.stringify({ error: '请求体中缺少有效的图像Base64编码 (image_base64)' }),
+        };
+    }
 
     try {
-        const aihubmixResponse = await fetch(AIHUBMIX_API_URL, {
+        // Convert Base64 to Buffer
+        const imageBuffer = Buffer.from(image_base64, 'base64');
+
+        const form = new FormData();
+        form.append('image', imageBuffer, { filename: 'input_image.png', contentType: 'image/png' }); // Assuming PNG, adjust if needed
+        form.append('model', 'gpt-image-1');
+        // Use a specific prompt for background removal, or allow user to pass one
+        form.append('prompt', userPrompt || "Remove the background, making it transparent. Keep the main subject clear and high quality.");
+        form.append('n', n.toString());
+        form.append('size', size);
+        form.append('response_format', 'b64_json');
+
+        const apiUrl = 'https://aihubmix.com/v1/images/edits';
+
+        console.log(`[aihubmix-proxy] Calling Aihubmix API: ${apiUrl} with model gpt-image-1 (edits)`);
+
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
+                ...form.getHeaders(), // Important: form-data sets the Content-Type with boundary
             },
-            body: JSON.stringify(apiRequestBodyForAihubmix),
+            body: form,
         });
 
-        const responseData = await aihubmixResponse.json();
-        console.debug('[aihubmix-proxy] Received response from Aihubmix:', JSON.stringify(responseData));
+        const responseText = await response.text(); // Get raw text first for better error diagnosis
 
-        if (!aihubmixResponse.ok) {
-            console.error(`[aihubmix-proxy] Aihubmix API error: ${aihubmixResponse.status}`, responseData);
+        if (!response.ok) {
+            console.error(`[aihubmix-proxy] Aihubmix API Error: ${response.status} ${response.statusText}`, responseText);
+            let errorDetails = responseText;
+            try {
+                errorDetails = JSON.parse(responseText); // Try to parse if it's JSON
+            } catch (e) { /* Ignore if not JSON */ }
             return {
-                statusCode: aihubmixResponse.status,
-                body: JSON.stringify({ error: 'Aihubmix API处理失败', details: responseData }),
+                statusCode: response.status,
+                body: JSON.stringify({ 
+                    error: 'Aihubmix API处理失败', 
+                    status: response.status,
+                    details: errorDetails 
+                }),
             };
         }
-        
-        const processedImageUrl = responseData.data && responseData.data[0] && responseData.data[0].url;
 
-        if (!processedImageUrl) {
-            console.error('[aihubmix-proxy] Processed image URL not found in Aihubmix response:', responseData);
+        const data = JSON.parse(responseText); // Now parse as JSON
+
+        // Assuming the response structure is similar to OpenAI's DALL-E API for edits
+        // which returns an array of objects, each with a b64_json property.
+        if (data.data && data.data.length > 0 && data.data[0].b64_json) {
+            console.log('[aihubmix-proxy] Successfully processed image with gpt-image-1 (edits).');
+        } else {
+            console.error('[aihubmix-proxy] Unexpected response structure from Aihubmix (edits):', data);
             return {
                 statusCode: 500,
-                body: JSON.stringify({ error: '从Aihubmix API响应中未能提取处理后的图像URL', details: responseData }),
+                body: JSON.stringify({ error: '从Aihubmix API响应中未能提取处理后的图像Base64编码', details: data }),
             };
         }
 
-        console.log('[aihubmix-proxy] Successfully processed image. Returning URL:', processedImageUrl);
+        const processedBase64FromAihubmix = data.data[0].b64_json;
+
+        console.log('[aihubmix-proxy] Successfully processed image with gpt-image-1 (edits). Now uploading to Cloudinary.');
+
+        // Upload to Cloudinary
+        const cloudinaryUploadResponse = await cloudinary.uploader.upload(
+            `data:image/png;base64,${processedBase64FromAihubmix}`,
+            {
+                folder: "whiteboard_app_processed_images", // Optional: specify a folder in Cloudinary
+                resource_type: "image"
+            }
+        );
+
+        console.log('[aihubmix-proxy] Successfully uploaded to Cloudinary.');
+
         return {
             statusCode: 200,
-            body: JSON.stringify({ processedImageUrl: processedImageUrl }),
+            body: JSON.stringify({ processedImageUrl: cloudinaryUploadResponse.secure_url }), // Return Cloudinary URL
         };
 
     } catch (error) {
-        console.error('[aihubmix-proxy] Error calling Aihubmix API (node-fetch):', error.name, error.message, error.stack);
+        console.error('[aihubmix-proxy] Error calling Aihubmix API (node-fetch/form-data):', error.name, error.message, error.stack);
+        // Check if the error is from Cloudinary or Aihubmix based on its properties or message
+        let errorSource = 'Aihubmix or Form-Data';
+        if (error.http_code && error.message && error.message.includes('Cloudinary')) { // Basic check for Cloudinary error structure
+            errorSource = 'Cloudinary';
+        }
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: '调用Aihubmix API时出错', details: error.message }),
+            body: JSON.stringify({ error: `调用 ${errorSource} API 时出错`, details: error.message, error_obj: error }),
         };
     }
 };
