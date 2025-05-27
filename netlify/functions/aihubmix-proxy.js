@@ -78,6 +78,7 @@ exports.handler = async (event, context) => {
         const apiUrl = 'https://aihubmix.com/v1/images/edits';
 
         console.log(`[aihubmix-proxy] Calling Aihubmix API: ${apiUrl} with model gpt-image-1 (edits)`);
+        const aihubmixStartTime = Date.now(); // Log start time for Aihubmix
 
         const response = await fetch(apiUrl, {
             method: 'POST',
@@ -87,6 +88,9 @@ exports.handler = async (event, context) => {
             },
             body: form,
         });
+
+        const aihubmixEndTime = Date.now(); // Log end time for Aihubmix
+        console.log(`[aihubmix-proxy] Aihubmix API call took ${aihubmixEndTime - aihubmixStartTime} ms`);
 
         const responseText = await response.text(); // Get raw text first for better error diagnosis
 
@@ -123,6 +127,7 @@ exports.handler = async (event, context) => {
         const processedBase64FromAihubmix = data.data[0].b64_json;
 
         console.log('[aihubmix-proxy] Successfully processed image with gpt-image-1 (edits). Now uploading to Cloudinary.');
+        const cloudinaryStartTime = Date.now(); // Log start time for Cloudinary
 
         // Upload to Cloudinary
         const cloudinaryUploadResponse = await cloudinary.uploader.upload(
@@ -132,6 +137,9 @@ exports.handler = async (event, context) => {
                 resource_type: "image"
             }
         );
+
+        const cloudinaryEndTime = Date.now(); // Log end time for Cloudinary
+        console.log(`[aihubmix-proxy] Cloudinary upload took ${cloudinaryEndTime - cloudinaryStartTime} ms`);
 
         console.log('[aihubmix-proxy] Successfully uploaded to Cloudinary.');
 
