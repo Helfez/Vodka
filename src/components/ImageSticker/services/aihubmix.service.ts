@@ -8,10 +8,6 @@
 //     });
 // };
 
-// Constants for polling
-const POLLING_INTERVAL_MS = 3000; // 3 seconds
-const MAX_POLLING_ATTEMPTS = 20; // 20 attempts * 3s = 60 seconds timeout
-
 export class AihubmixService {
     private static instance: AihubmixService;
 
