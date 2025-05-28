@@ -79,7 +79,6 @@ export default async (request, context) => {
         // Parameters for OpenAI SDK call
         const model = "gpt-image-1"; // Or make this configurable via taskDataFromBlob if needed
         const quality = "high";      // Or make this configurable
-        const response_format = "b64_json";
 
         console.log(`[aihubmix-process-background] Task ${taskId}: Calling AIhubmix images.edit via SDK with model=${model}, n=${n}, size=${size}, quality=${quality}`);
         
@@ -89,14 +88,13 @@ export default async (request, context) => {
             prompt: userPrompt,
             n: parseInt(n, 10), // Ensure n is an integer
             size: size,
-            quality: quality,
-            response_format: response_format 
+            quality: quality
         });
 
         console.log(`[aihubmix-process-background] Task ${taskId}: AIhubmix SDK response received.`);
 
-        if (!aihubmixResponse || !aihubmixResponse.data || !aihubmixResponse.data[0] || !aihubmixResponse.data[0].b64_json) {
-            const errorDetail = '[aihubmix-process-background] Task ${taskId}: Invalid response structure from AIhubmix SDK.';
+        if (!aihubmixResponse || !aihubmixResponse.data || !aihubmixResponse.data[0]) {
+            const errorDetail = `[aihubmix-process-background] Task ${taskId}: Invalid response structure from AIhubmix SDK.`;
             console.error(errorDetail, aihubmixResponse);
             await store.setJSON(taskId, { 
                 ...taskDataFromBlob,
@@ -110,20 +108,46 @@ export default async (request, context) => {
             });
         }
 
-        const processedImageBase64 = aihubmixResponse.data[0].b64_json;
-        console.log(`[aihubmix-process-background] Task ${taskId}: Image processed by AIhubmix. Uploading to Cloudinary.`);
+        // 检查返回的是URL还是base64数据
+        const responseData = aihubmixResponse.data[0];
+        let imageUrl;
+        
+        if (responseData.url) {
+            // 如果返回的是URL，直接使用
+            imageUrl = responseData.url;
+            console.log(`[aihubmix-process-background] Task ${taskId}: Received image URL from AIhubmix: ${imageUrl}`);
+        } else if (responseData.b64_json) {
+            // 如果返回的是base64，上传到Cloudinary
+            const processedImageBase64 = responseData.b64_json;
+            console.log(`[aihubmix-process-background] Task ${taskId}: Image processed by AIhubmix. Uploading to Cloudinary.`);
 
-        const cloudinaryUploadResponse = await cloudinaryV2.uploader.upload(`data:image/png;base64,${processedImageBase64}`, {
-            folder: 'aihubmix_processed',
-            resource_type: 'image',
-            timeout: 60000 // 1 minute timeout for upload
-        });
+            const cloudinaryUploadResponse = await cloudinaryV2.uploader.upload(`data:image/png;base64,${processedImageBase64}`, {
+                folder: 'aihubmix_processed',
+                resource_type: 'image',
+                timeout: 60000 // 1 minute timeout for upload
+            });
 
-        console.log(`[aihubmix-process-background] Task ${taskId}: Image uploaded to Cloudinary: ${cloudinaryUploadResponse.secure_url}`);
+            imageUrl = cloudinaryUploadResponse.secure_url;
+            console.log(`[aihubmix-process-background] Task ${taskId}: Image uploaded to Cloudinary: ${imageUrl}`);
+        } else {
+            const errorDetail = `[aihubmix-process-background] Task ${taskId}: No valid image data in response.`;
+            console.error(errorDetail, responseData);
+            await store.setJSON(taskId, { 
+                ...taskDataFromBlob,
+                status: 'failed', 
+                error: errorDetail,
+                failedAt: new Date().toISOString()
+            });
+            return new Response(JSON.stringify({ message: 'Task failed due to missing image data, status updated in Blob' }), {
+                status: 200, 
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
         await store.setJSON(taskId, { 
             ...taskDataFromBlob,
             status: 'completed', 
-            imageUrl: cloudinaryUploadResponse.secure_url,
+            imageUrl: imageUrl,
             completedAt: new Date().toISOString()
         });
 
