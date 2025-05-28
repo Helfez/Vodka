@@ -21,7 +21,7 @@ export class AihubmixDalleService {
   }
 
   /**
-   * 生成图片
+   * 生成图片 - 使用后台处理避免超时
    * @param prompt 图片生成提示词
    * @param options 生成选项
    * @returns 生成的图片信息
@@ -58,66 +58,55 @@ export class AihubmixDalleService {
       console.log('  - 图片尺寸:', finalOptions.size);
       console.log('  - 图片质量:', finalOptions.quality);
       console.log('  - 图片风格:', finalOptions.style);
-      console.log('  - 目标URL:', `${this.baseUrl}/.netlify/functions/aihubmix-dalle-generate`);
-      
-      const requestBody = {
-        prompt,
-        ...finalOptions
-      };
+      console.log('  - 使用后台处理避免超时');
 
-      console.log('[AihubmixDalleService generateImage] 🚀 发起网络请求...');
-      const requestStartTime = performance.now();
+      // 第一步：启动后台任务
+      console.log('[AihubmixDalleService generateImage] 🚀 启动后台生成任务...');
+      const taskStartTime = performance.now();
       
-      const response = await fetch(`${this.baseUrl}/.netlify/functions/aihubmix-dalle-generate`, {
+      const taskResponse = await fetch(`${this.baseUrl}/.netlify/functions/aihubmix-native`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          action: 'generate', // 新增action参数区分生成和编辑
+          prompt,
+          ...finalOptions
+        }),
       });
 
-      const requestEndTime = performance.now();
-      const requestDuration = Math.round(requestEndTime - requestStartTime);
-
-      console.log('[AihubmixDalleService generateImage] 📡 网络请求完成:');
-      console.log('  - 请求耗时:', requestDuration, 'ms');
-      console.log('  - 响应状态:', response.status, response.statusText);
-      console.log('  - 响应头:', Object.fromEntries(response.headers.entries()));
-
-      if (!response.ok) {
-        console.error('[AihubmixDalleService generateImage] ❌ HTTP请求失败');
-        const errorData = await response.json().catch(() => ({}));
-        console.error('  - 错误数据:', errorData);
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+      if (!taskResponse.ok) {
+        console.error('[AihubmixDalleService generateImage] ❌ 任务启动失败');
+        const errorData = await taskResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${taskResponse.status}: ${taskResponse.statusText}`);
       }
 
-      console.log('[AihubmixDalleService generateImage] 📖 解析响应数据...');
-      const result = await response.json();
-      
-      if (!result.success) {
-        console.error('[AihubmixDalleService generateImage] ❌ 业务逻辑失败:', result.error);
-        throw new Error(result.error || '图片生成失败');
+      const taskResult = await taskResponse.json();
+      const taskId = taskResult.taskId;
+
+      if (!taskId) {
+        console.error('[AihubmixDalleService generateImage] ❌ 未获取到任务ID');
+        throw new Error('未能启动后台生成任务');
       }
 
-      console.log('[AihubmixDalleService generateImage] ✅ 生成成功:');
+      console.log('[AihubmixDalleService generateImage] ✅ 后台任务已启动，任务ID:', taskId);
+
+      // 第二步：轮询任务状态
+      console.log('[AihubmixDalleService generateImage] 🔄 开始轮询任务状态...');
+      const result = await this.pollTaskStatus(taskId);
+
+      const taskEndTime = performance.now();
+      const totalDuration = Math.round(taskEndTime - taskStartTime);
+
+      console.log('[AihubmixDalleService generateImage] ✅ 生成完成:');
+      console.log('  - 总耗时:', totalDuration, 'ms');
       console.log('  - 生成图片数量:', result.images?.length || 0);
-      console.log('  - 使用情况:', result.usage);
-      console.log('  - 元数据:', result.metadata);
-      
-      result.images?.forEach((image: any, index: number) => {
-        console.log(`  - 图片${index + 1}:`, {
-          url: image.url?.substring(0, 50) + '...',
-          hasRevisedPrompt: !!image.revised_prompt,
-          revisedPromptLength: image.revised_prompt?.length || 0
-        });
-      });
+      console.log('  - 任务ID:', taskId);
 
       console.log('[AihubmixDalleService generateImage] === DALL-E生成服务完成 ===');
 
-      return {
-        images: result.images,
-        usage: result.usage
-      };
+      return result;
 
     } catch (error) {
       console.error('[AihubmixDalleService generateImage] ❌ 生成失败:', error);
@@ -129,6 +118,81 @@ export class AihubmixDalleService {
   }
 
   /**
+   * 轮询任务状态直到完成
+   */
+  private async pollTaskStatus(taskId: string): Promise<{
+    images: Array<{
+      url: string;
+      revised_prompt?: string;
+    }>;
+    usage?: any;
+  }> {
+    console.log('[AihubmixDalleService pollTaskStatus] 🔄 开始轮询任务:', taskId);
+    
+    const maxAttempts = 60; // 最多轮询60次
+    const pollInterval = 2000; // 每2秒轮询一次
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+      attempts++;
+      console.log(`[AihubmixDalleService pollTaskStatus] 📊 轮询第${attempts}次，任务ID:`, taskId);
+
+      try {
+        const statusResponse = await fetch(`${this.baseUrl}/.netlify/functions/aihubmix-status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ taskId }),
+        });
+
+        if (!statusResponse.ok) {
+          console.warn(`[AihubmixDalleService pollTaskStatus] ⚠️ 状态查询失败，第${attempts}次尝试`);
+          await this.sleep(pollInterval);
+          continue;
+        }
+
+        const statusData = await statusResponse.json();
+        console.log(`[AihubmixDalleService pollTaskStatus] 📋 任务状态:`, statusData.status);
+
+        if (statusData.status === 'completed') {
+          console.log('[AihubmixDalleService pollTaskStatus] ✅ 任务完成');
+          return {
+            images: [{
+              url: statusData.imageUrl,
+              revised_prompt: statusData.revised_prompt
+            }],
+            usage: statusData.usage
+          };
+        } else if (statusData.status === 'failed') {
+          console.error('[AihubmixDalleService pollTaskStatus] ❌ 任务失败:', statusData.error);
+          throw new Error(statusData.error || '后台任务执行失败');
+        } else if (statusData.status === 'processing') {
+          console.log(`[AihubmixDalleService pollTaskStatus] ⏳ 任务处理中，等待${pollInterval}ms后重试...`);
+        } else {
+          console.log(`[AihubmixDalleService pollTaskStatus] 🔄 任务状态: ${statusData.status}，继续等待...`);
+        }
+
+        await this.sleep(pollInterval);
+
+      } catch (error) {
+        console.warn(`[AihubmixDalleService pollTaskStatus] ⚠️ 轮询出错，第${attempts}次尝试:`, error);
+        await this.sleep(pollInterval);
+      }
+    }
+
+    console.error('[AihubmixDalleService pollTaskStatus] ❌ 轮询超时，任务可能仍在处理中');
+    throw new Error('任务处理超时，请稍后重试');
+  }
+
+  /**
+   * 等待指定毫秒数
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
    * 检查服务是否可用
    */
   async isAvailable(): Promise<boolean> {
@@ -137,8 +201,8 @@ export class AihubmixDalleService {
     try {
       const checkStartTime = performance.now();
       
-      // 简单的健康检查
-      const response = await fetch(`${this.baseUrl}/.netlify/functions/aihubmix-dalle-generate`, {
+      // 检查后台处理服务
+      const response = await fetch(`${this.baseUrl}/.netlify/functions/aihubmix-native`, {
         method: 'OPTIONS'
       });
       

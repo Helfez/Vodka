@@ -33,6 +33,13 @@ export default async (request, context) => {
     try {
         const bodyText = await request.text();
         requestBody = JSON.parse(bodyText);
+        console.log('[aihubmix-native-trigger] 📋 请求参数:', {
+            action: requestBody.action,
+            hasImage: !!requestBody.image_base64,
+            promptLength: requestBody.prompt?.length || 0,
+            n: requestBody.n,
+            size: requestBody.size
+        });
     } catch (error) {
         console.error('[aihubmix-native-trigger] Invalid JSON body:', error.message);
         return new Response(JSON.stringify({ error: '无效的JSON请求体', details: error.message }), {
@@ -42,21 +49,42 @@ export default async (request, context) => {
     }
 
     const { 
-        image_base64, 
-        prompt: userPrompt, // Use the user's prompt
-        n = 1,              // Default n to 1 for background processing unless specified
-        size = "1024x1024"  // Default size unless specified
+        action = 'edit',    // 新增：操作类型，'edit' 或 'generate'
+        image_base64,       // 图片编辑时需要
+        prompt: userPrompt, // 提示词
+        n = 1,              // 生成图片数量
+        size = "1024x1024", // 图片尺寸
+        quality = "standard", // 图片质量
+        style = "vivid"     // 图片风格
     } = requestBody;
 
-    if (!image_base64) {
-        console.error('[aihubmix-native-trigger] Missing image_base64 parameter');
-        return new Response(JSON.stringify({ error: '请求体中缺少有效的图像Base64编码 (image_base64)' }), {
+    // 验证参数
+    if (action === 'edit') {
+        if (!image_base64) {
+            console.error('[aihubmix-native-trigger] ❌ 图片编辑模式缺少image_base64参数');
+            return new Response(JSON.stringify({ error: '图片编辑模式需要提供图像Base64编码 (image_base64)' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+    } else if (action === 'generate') {
+        if (!userPrompt) {
+            console.error('[aihubmix-native-trigger] ❌ 图片生成模式缺少prompt参数');
+            return new Response(JSON.stringify({ error: '图片生成模式需要提供提示词 (prompt)' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+    } else {
+        console.error('[aihubmix-native-trigger] ❌ 不支持的操作类型:', action);
+        return new Response(JSON.stringify({ error: '不支持的操作类型，请使用 "edit" 或 "generate"' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }
     
     const taskId = uuidv4();
+    console.log(`[aihubmix-native-trigger] 🆕 创建任务: ${taskId}, 操作类型: ${action}`);
     
     // 在 Functions v2 中，Netlify Blobs 应该自动工作
     let store;
@@ -75,24 +103,39 @@ export default async (request, context) => {
     }
 
     try {
-        const taskData = {
+        // 根据操作类型构建任务数据
+        const baseTaskData = {
             taskId,
-            image_base64, // Store the full base64
-            prompt: userPrompt || "Remove the background, making it transparent. Keep the main subject clear and high quality.", // Default prompt if not provided
+            action,
+            prompt: userPrompt,
             n: parseInt(n, 10),
             size: size,
             status: 'pending',
             submittedAt: new Date().toISOString()
         };
 
+        let taskData;
+        if (action === 'edit') {
+            taskData = {
+                ...baseTaskData,
+                image_base64, // 图片编辑需要原图
+                prompt: userPrompt || "Remove the background, making it transparent. Keep the main subject clear and high quality."
+            };
+        } else if (action === 'generate') {
+            taskData = {
+                ...baseTaskData,
+                quality,
+                style
+            };
+        }
+
         await store.setJSON(taskId, taskData);
-        console.log(`[aihubmix-native-trigger] Task ${taskId} stored in Blobs with status 'pending'.`);
+        console.log(`[aihubmix-native-trigger] ✅ 任务 ${taskId} 已存储到Blobs，状态: pending`);
 
         // 使用更可靠的方式调用background函数
         const backgroundFunctionURL = `${siteURL}/.netlify/functions/aihubmix-process-background`;
         
-        console.log(`[aihubmix-native-trigger] Invoking background function at ${backgroundFunctionURL} for task ${taskId}`);
-        console.log(`[aihubmix-native-trigger] Site URL: ${siteURL}`);
+        console.log(`[aihubmix-native-trigger] 🚀 调用后台函数: ${backgroundFunctionURL}, 任务: ${taskId}`);
 
         // 使用全局fetch而不是node-fetch
         const fetchPromise = fetch(backgroundFunctionURL, {
@@ -106,10 +149,10 @@ export default async (request, context) => {
 
         // 不等待结果，但添加更详细的错误处理
         fetchPromise.then(async (res) => {
-            console.log(`[aihubmix-native-trigger] Background function response status: ${res.status} for task ${taskId}`);
+            console.log(`[aihubmix-native-trigger] 📡 后台函数响应状态: ${res.status}, 任务: ${taskId}`);
             if (!res.ok) {
                 const errorText = await res.text().catch(() => 'Unable to read error response');
-                console.error(`[aihubmix-native-trigger] Error invoking background function for task ${taskId}. Status: ${res.status}, Response: ${errorText}`);
+                console.error(`[aihubmix-native-trigger] ❌ 后台函数调用失败，任务: ${taskId}, 状态: ${res.status}, 响应: ${errorText}`);
                 
                 // 更新任务状态为失败
                 try {
@@ -120,13 +163,13 @@ export default async (request, context) => {
                         failedAt: new Date().toISOString()
                     });
                 } catch (updateError) {
-                    console.error(`[aihubmix-native-trigger] Failed to update task status after background invocation error:`, updateError);
+                    console.error(`[aihubmix-native-trigger] ❌ 更新任务状态失败:`, updateError);
                 }
             } else {
-                console.log(`[aihubmix-native-trigger] Successfully invoked background function for task ${taskId}.`);
+                console.log(`[aihubmix-native-trigger] ✅ 成功调用后台函数，任务: ${taskId}`);
             }
         }).catch(async (err) => {
-            console.error(`[aihubmix-native-trigger] Network error invoking background function for task ${taskId}:`, err);
+            console.error(`[aihubmix-native-trigger] ❌ 网络错误，任务: ${taskId}:`, err);
             
             // 更新任务状态为失败
             try {
@@ -137,33 +180,35 @@ export default async (request, context) => {
                     failedAt: new Date().toISOString()
                 });
             } catch (updateError) {
-                console.error(`[aihubmix-native-trigger] Failed to update task status after network error:`, updateError);
+                console.error(`[aihubmix-native-trigger] ❌ 网络错误后更新状态失败:`, updateError);
             }
         });
 
         return new Response(JSON.stringify({ 
             success: true, 
             taskId: taskId,
+            action: action,
             status: 'pending',
-            message: '任务已提交处理，请稍后查询状态。'
+            message: `${action === 'generate' ? '图片生成' : '图片编辑'}任务已提交处理，请稍后查询状态。`
         }), {
             status: 202, // Accepted for processing
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
     } catch (error) {
-        console.error(`[aihubmix-native-trigger] Error processing request for task ${taskId}:`, error);
+        console.error(`[aihubmix-native-trigger] ❌ 处理请求失败，任务: ${taskId}:`, error);
         // If task creation failed before even invoking background, update blob for taskId if possible
         if (taskId) {
             try {
                 await store.setJSON(taskId, {
                     taskId,
+                    action,
                     status: 'failed',
                     error: `Trigger function error: ${error.message}`,
                     failedAt: new Date().toISOString()
                 });
             } catch (blobError) {
-                console.error(`[aihubmix-native-trigger] Error updating blob for failed task ${taskId}:`, blobError);
+                console.error(`[aihubmix-native-trigger] ❌ 更新失败任务状态出错:`, blobError);
             }
         }
         return new Response(JSON.stringify({ error: '处理请求失败', details: error.message }), {
