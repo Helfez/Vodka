@@ -1,4 +1,4 @@
-const OpenAI = require('openai');
+const { OpenAI, toFile } = require('openai');
 
 exports.handler = async (event, context) => {
     console.log('[aihubmix-native-sdk] Function invoked.');
@@ -72,33 +72,17 @@ exports.handler = async (event, context) => {
         console.log('[aihubmix-native-sdk] Processing image with OpenAI SDK via AIhubmix...');
 
         // 将base64字符串转换为Node.js Buffer，然后模拟文件上传
-        // OpenAI Node SDK v4+ 需要文件作为 ReadableStream 或特定对象
-        // 最简单的方式可能是将base64转为Buffer，然后用它创建一个可读流，
-        // 或者利用一些辅助库。但对于 images.edit, 它期望的是一个文件路径或Node.js的fs.ReadStream
-        // 直接传递 base64 字符串给 `image` 参数是 DALL-E 2 (旧版) 的做法，且通常用于API Playground。
-        // 对于 Node.js SDK, `image` 参数期望的是一个 `fs.ReadStream` 或等效的对象。
-        // 然而，AIhubmix的Python示例是 `image=open("path", "rb")`
-        // 它的Node.js SDK的对应方法需要一个可以被读取的对象。
-
-        // 重要的更正：OpenAI Node.js SDK 的 `images.edit` 方法期望 `image` 参数是一个
-        // `Uploadable` 类型，它可以是 `NodeJS.ReadableStream`, `File`, `RequestData` 等。
-        // 将 Base64 字符串转换为一个可供 SDK 使用的 "文件"表示的最直接方式是将其转换为 Buffer，
-        // 并模拟一个文件对象。
-
         const imageBuffer = Buffer.from(image_base64, 'base64');
         
-        // 为了让OpenAI SDK正确处理，我们需要将Buffer包装成一个它能识别的文件状对象。
-        // SDK内部会处理成multipart/form-data。
-        // 创建一个足够像文件的对象，包含buffer和文件名
-        const imageFile = {
-            file: imageBuffer,
-            name: 'image.png', // SDK需要一个文件名来正确构建form-data
-        };
+        // 使用 toFile 辅助函数创建 Uploadable 对象
+        const imageFileUploadable = await toFile(imageBuffer, 'image.png', {
+            type: 'image/png', // 明确指定MIME类型
+        });
 
         console.log(`[aihubmix-native-sdk] Calling AIhubmix images.edit with model gpt-image-1`);
         const response = await openai.images.edit({
             model: "gpt-image-1",
-            image: imageFile, // 将Buffer包装后传递
+            image: imageFileUploadable, // 将 toFile的结果 传递
             prompt: userPrompt || "redesign poster of the movie [Black Swan], 3D cartoon, smooth render, bright tone, 2:3 portrait.",
             n: parseInt(n, 10),
             size: size,
