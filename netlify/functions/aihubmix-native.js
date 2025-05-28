@@ -27,7 +27,7 @@ export default async (request, context) => {
         });
     }
 
-    const siteURL = context.site?.url || process.env.URL || 'http://localhost:8888';
+    const siteURL = context.site?.url || process.env.URL || 'https://d-vodka.netlify.app';
 
     let requestBody;
     try {
@@ -88,38 +88,57 @@ export default async (request, context) => {
         await store.setJSON(taskId, taskData);
         console.log(`[aihubmix-native-trigger] Task ${taskId} stored in Blobs with status 'pending'.`);
 
-        // Asynchronously invoke the background processing function
-        // We directly call the function name. If a -background.js version exists, Netlify handles it.
-        // Otherwise, the function itself needs to be designed for potentially long execution or this call needs to be non-blocking.
-        // For true async, the background function should be named like 'aihubmix-process-background-background.js'
-        // and called via its specific background endpoint.
-        // Let's assume for now `aihubmix-process-background` is designed to be invoked and run in background.
-        
+        // 使用更可靠的方式调用background函数
         const backgroundFunctionURL = `${siteURL}/.netlify/functions/aihubmix-process-background`;
         
         console.log(`[aihubmix-native-trigger] Invoking background function at ${backgroundFunctionURL} for task ${taskId}`);
+        console.log(`[aihubmix-native-trigger] Site URL: ${siteURL}`);
 
-        // Fire-and-forget invocation of the background function.
-        // We don't await this, as we want to return to the client immediately.
-        fetch(backgroundFunctionURL, {
+        // 使用全局fetch而不是node-fetch
+        const fetchPromise = fetch(backgroundFunctionURL, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                // Potentially add a secret header for inter-function communication if needed
+                'User-Agent': 'Netlify-Function-Internal'
             },
-            body: JSON.stringify({ taskId }) // Pass only the taskId
-        }).then(res => {
+            body: JSON.stringify({ taskId })
+        });
+
+        // 不等待结果，但添加更详细的错误处理
+        fetchPromise.then(async (res) => {
+            console.log(`[aihubmix-native-trigger] Background function response status: ${res.status} for task ${taskId}`);
             if (!res.ok) {
-                console.error(`[aihubmix-native-trigger] Error invoking background function for task ${taskId}. Status: ${res.status}`);
-                // Optionally, update blob store to reflect invocation failure
-                // store.setJSON(taskId, { ...taskData, status: 'trigger_failed', error: `Background invocation failed with status ${res.status}` });
+                const errorText = await res.text().catch(() => 'Unable to read error response');
+                console.error(`[aihubmix-native-trigger] Error invoking background function for task ${taskId}. Status: ${res.status}, Response: ${errorText}`);
+                
+                // 更新任务状态为失败
+                try {
+                    await store.setJSON(taskId, { 
+                        ...taskData, 
+                        status: 'trigger_failed', 
+                        error: `Background invocation failed with status ${res.status}: ${errorText}`,
+                        failedAt: new Date().toISOString()
+                    });
+                } catch (updateError) {
+                    console.error(`[aihubmix-native-trigger] Failed to update task status after background invocation error:`, updateError);
+                }
             } else {
                 console.log(`[aihubmix-native-trigger] Successfully invoked background function for task ${taskId}.`);
             }
-        }).catch(err => {
+        }).catch(async (err) => {
             console.error(`[aihubmix-native-trigger] Network error invoking background function for task ${taskId}:`, err);
-            // Optionally, update blob store
-            // store.setJSON(taskId, { ...taskData, status: 'trigger_failed', error: `Background invocation network error: ${err.message}` });
+            
+            // 更新任务状态为失败
+            try {
+                await store.setJSON(taskId, { 
+                    ...taskData, 
+                    status: 'trigger_failed', 
+                    error: `Background invocation network error: ${err.message}`,
+                    failedAt: new Date().toISOString()
+                });
+            } catch (updateError) {
+                console.error(`[aihubmix-native-trigger] Failed to update task status after network error:`, updateError);
+            }
         });
 
         return new Response(JSON.stringify({ 

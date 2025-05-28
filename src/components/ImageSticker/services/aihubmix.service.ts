@@ -43,23 +43,23 @@ export class AihubmixService {
 
         const base64Data = imageBase64.startsWith('data:') ? imageBase64.split(',')[1] : imageBase64;
 
-        const requestBody: { image_base64: string; prompt?: string } = {
+        const requestBody: { image_base64: string; prompt?: string; size?: string; n?: number } = {
             image_base64: base64Data,
         };
         if (prompt) {
             requestBody.prompt = prompt;
         }
 
-        console.debug('[AihubmixService convertToSticker] Sending to test function with body keys:', Object.keys(requestBody));
+        console.debug('[AihubmixService convertToSticker] Sending to native function with body keys:', Object.keys(requestBody));
 
         try {
             // 初始进度
             onProgress?.(10);
 
-            console.log('[AihubmixService convertToSticker] Calling aihubmix-simple-test function...');
+            console.log('[AihubmixService convertToSticker] Calling aihubmix-native function...');
             
-            // 使用简化的测试函数
-            const response = await fetch('/.netlify/functions/aihubmix-simple-test', {
+            // 第一步：提交任务
+            const response = await fetch('/.netlify/functions/aihubmix-native', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -78,13 +78,19 @@ export class AihubmixService {
             const responseData = await response.json();
             console.log('[AihubmixService convertToSticker] Response data:', responseData);
 
-            if (!responseData.success || !responseData.imageUrl) {
+            if (!responseData.success || !responseData.taskId) {
                 console.error('[AihubmixService convertToSticker] Invalid response format:', responseData);
-                throw new Error(`处理失败: ${responseData.error || responseData.details || '未知错误'}`);
+                throw new Error(`任务提交失败: ${responseData.error || '未知错误'}`);
             }
 
-            onProgress?.(100);
-            return responseData.imageUrl;
+            const taskId = responseData.taskId;
+            console.log('[AihubmixService convertToSticker] Task submitted with ID:', taskId);
+
+            // 任务提交进度
+            onProgress?.(30);
+
+            // 第二步：轮询任务状态
+            return await this.pollTaskStatus(taskId, onProgress);
 
         } catch (error: any) {
             console.error('[AihubmixService convertToSticker] Error in method:', error);
