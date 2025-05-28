@@ -19,14 +19,15 @@ const openai = new OpenAI({
     baseURL: 'https://aihubmix.com/v1',
 });
 
-export default async (event, context) => {
+export default async (request, context) => {
     console.log('[aihubmix-process-background] Function invoked.');
     
     let taskId;
     let taskDataFromBlob; // To store the full task data from blob
 
     try {
-        const requestBody = JSON.parse(event.body);
+        const bodyText = await request.text();
+        const requestBody = JSON.parse(bodyText);
         taskId = requestBody.taskId; // Expecting only taskId from the trigger
 
         if (!taskId) {
@@ -37,14 +38,14 @@ export default async (event, context) => {
             });
         }
 
-        // 在 Functions v2 中，Netlify Blobs 应该自动工作，但如果不行，我们提供备用参数
+        // 在 Functions v2 中，Netlify Blobs 应该自动工作
         let store;
         try {
             store = getStore('aihubmix_tasks'); // 首先尝试不带参数
         } catch (error) {
             console.log('[aihubmix-process-background] Fallback to manual siteID/token configuration');
             store = getStore('aihubmix_tasks', {
-                siteID: process.env.NETLIFY_SITE_ID || context.clientContext?.site?.id,
+                siteID: process.env.NETLIFY_SITE_ID || context.site?.id,
                 token: process.env.NETLIFY_TOKEN || process.env.NETLIFY_ACCESS_TOKEN
             }); // 手动提供 siteID 和 token
         }
@@ -136,14 +137,14 @@ export default async (event, context) => {
         
         if (taskId && getStore) { // Ensure store can be accessed
             try {
-                // 在 Functions v2 中，Netlify Blobs 应该自动工作，但如果不行，我们提供备用参数
+                // 在 Functions v2 中，Netlify Blobs 应该自动工作
                 let store;
                 try {
                     store = getStore('aihubmix_tasks'); // 首先尝试不带参数
                 } catch (storeError) {
                     console.log('[aihubmix-process-background] Fallback to manual siteID/token configuration in error handler');
                     store = getStore('aihubmix_tasks', {
-                        siteID: process.env.NETLIFY_SITE_ID || context.clientContext?.site?.id,
+                        siteID: process.env.NETLIFY_SITE_ID || context.site?.id,
                         token: process.env.NETLIFY_TOKEN || process.env.NETLIFY_ACCESS_TOKEN
                     }); // 手动提供 siteID 和 token
                 }

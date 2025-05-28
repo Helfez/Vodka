@@ -2,8 +2,10 @@ import { getStore } from '@netlify/blobs';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique task IDs
 import fetch from 'node-fetch'; // For invoking the background function
 
-export default async (event, context) => {
+export default async (request, context) => {
     console.log('[aihubmix-native-trigger] Function invoked.');
+    console.log('[aihubmix-native-trigger] Request method:', request.method);
+    console.log('[aihubmix-native-trigger] Request URL:', request.url);
 
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
@@ -11,25 +13,26 @@ export default async (event, context) => {
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
     };
 
-    if (event.httpMethod === 'OPTIONS') {
+    if (request.method === 'OPTIONS') {
         return new Response('', {
             status: 200,
             headers: corsHeaders
         });
     }
 
-    if (event.httpMethod !== 'POST') {
+    if (request.method !== 'POST') {
         return new Response(JSON.stringify({ error: '只允许POST方法' }), {
             status: 405,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }
 
-    const siteURL = context.clientContext?.site?.url || process.env.URL || 'http://localhost:8888';
+    const siteURL = context.site?.url || process.env.URL || 'http://localhost:8888';
 
     let requestBody;
     try {
-        requestBody = JSON.parse(event.body);
+        const bodyText = await request.text();
+        requestBody = JSON.parse(bodyText);
     } catch (error) {
         console.error('[aihubmix-native-trigger] Invalid JSON body:', error.message);
         return new Response(JSON.stringify({ error: '无效的JSON请求体', details: error.message }), {
@@ -55,14 +58,14 @@ export default async (event, context) => {
     
     const taskId = uuidv4();
     
-    // 在 Functions v2 中，Netlify Blobs 应该自动工作，但如果不行，我们提供备用参数
+    // 在 Functions v2 中，Netlify Blobs 应该自动工作
     let store;
     try {
         store = getStore('aihubmix_tasks'); // 首先尝试不带参数
     } catch (error) {
         console.log('[aihubmix-native-trigger] Fallback to manual siteID/token configuration');
-        // 获取 Netlify 环境变量
-        const siteID = process.env.NETLIFY_SITE_ID || context.clientContext?.site?.id;
+        // 在 Functions v2 中，使用 context 对象的正确属性
+        const siteID = process.env.NETLIFY_SITE_ID || context.site?.id;
         const token = process.env.NETLIFY_TOKEN || process.env.NETLIFY_ACCESS_TOKEN;
         
         store = getStore('aihubmix_tasks', { 
