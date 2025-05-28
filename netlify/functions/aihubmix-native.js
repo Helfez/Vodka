@@ -35,6 +35,11 @@ exports.handler = async (event, context) => {
         };
     }
 
+    const openai = new OpenAI({
+        apiKey: apiKey,
+        baseURL: 'https://aihubmix.com/v1',
+    });
+
     let requestBody;
     try {
         requestBody = JSON.parse(event.body);
@@ -47,13 +52,7 @@ exports.handler = async (event, context) => {
         };
     }
 
-    const { 
-        image_base64, 
-        prompt: userPrompt, 
-        size = "1024x1536",
-        n = 2
-    } = requestBody;
-
+    const { image_base64 } = requestBody;
     if (!image_base64) {
         console.error('[aihubmix-native-sdk] Missing image_base64 parameter');
         return {
@@ -63,31 +62,29 @@ exports.handler = async (event, context) => {
         };
     }
 
-    const openai = new OpenAI({
-        apiKey: apiKey,
-        baseURL: 'https://aihubmix.com/v1',
-    });
-
     try {
-        console.log('[aihubmix-native-sdk] Processing image with OpenAI SDK via AIhubmix...');
+        console.log('[aihubmix-native-sdk] Processing image with STRICTLY hardcoded parameters...');
 
-        // 将base64字符串转换为Node.js Buffer，然后模拟文件上传
         const imageBuffer = Buffer.from(image_base64, 'base64');
-        
-        // 使用 toFile 辅助函数创建 Uploadable 对象
         const imageFileUploadable = await toFile(imageBuffer, 'image.png', {
-            type: 'image/png', // 明确指定MIME类型
+            type: 'image/png',
         });
 
-        console.log(`[aihubmix-native-sdk] Calling AIhubmix images.edit with model gpt-image-1`);
+        const model = "gpt-image-1";
+        const prompt = "redesign poster of the movie [Black Swan], 3D cartoon, smooth render, bright tone, 2:3 portrait.";
+        const n = 2;
+        const size = "1024x1536";
+        const quality = "high";
+
+        console.log(`[aihubmix-native-sdk] Calling AIhubmix images.edit with fixed params: model=${model}, n=${n}, size=${size}, quality=${quality}`);
+
         const response = await openai.images.edit({
-            model: "gpt-image-1",
-            image: imageFileUploadable, // 将 toFile的结果 传递
-            prompt: userPrompt || "redesign poster of the movie [Black Swan], 3D cartoon, smooth render, bright tone, 2:3 portrait.",
-            n: parseInt(n, 10),
+            model: model,
+            image: imageFileUploadable,
+            prompt: prompt,
+            n: n,
             size: size,
-            quality: "high",
-            response_format: 'b64_json' // AIhubmix 示例显示返回 b64_json
+            quality: quality
         });
 
         console.log('[aihubmix-native-sdk] AIhubmix response received.');
@@ -101,55 +98,67 @@ exports.handler = async (event, context) => {
             };
         }
 
-        const imageData = response.data[0];
-        let imageUrl = null;
+        const imageDataItem = response.data[0];
+        let resultOutput = {};
 
-        if (imageData.b64_json) {
-            imageUrl = `data:image/png;base64,${imageData.b64_json}`;
-            console.log('[aihubmix-native-sdk] Image processed successfully with base64 data');
-        } else if (imageData.url) {
-            imageUrl = imageData.url;
-            console.log('[aihubmix-native-sdk] Image processed successfully with URL:', imageData.url);
+        if (imageDataItem.b64_json) {
+            resultOutput.imageUrl = `data:image/png;base64,${imageDataItem.b64_json}`;
+            console.log('[aihubmix-native-sdk] Image processed successfully with base64 data from item.');
+        } else if (imageDataItem.url) {
+            resultOutput.imageUrl = imageDataItem.url;
+            console.log('[aihubmix-native-sdk] Image processed successfully with URL from item:', imageDataItem.url);
         } else {
-            console.log('[aihubmix-native-sdk] No image data found in response');
+            console.log('[aihubmix-native-sdk] No b64_json or url found in the first image data item:', imageDataItem);
+            console.log('[aihubmix-native-sdk] Full response.data:', response.data);
             return {
                 statusCode: 500,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     error: '未能生成处理后的图像',
-                    details: '响应中没有图像数据',
-                    fullResponse: response
+                    details: '响应中没有图像数据(b64_json or url)在第一个项目中',
+                    fullResponseData: response.data
                 })
             };
         }
+
+        resultOutput.allData = response.data;
 
         return {
             statusCode: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 success: true,
-                imageUrl: imageUrl,
+                data: response.data,
                 message: '图像处理完成'
             })
         };
 
     } catch (error) {
-        console.error('[aihubmix-native-sdk] Error processing image:', error.message);
+        console.error('[aihubmix-native-sdk] Error processing image:', error);
         let errorStatus = 500;
-        let errorDetails = error.message;
+        let errorBody = { 
+            error: '图像处理失败',
+            details: error.message,
+            errorName: error.name,
+            stack: error.stack
+        };
         if (error.response) {
-            console.error('Error Response Body:', error.response.data);
+            console.error('Error Response Status:', error.response.status);
+            console.error('Error Response Data:', error.response.data);
             errorStatus = error.response.status || 500;
-            errorDetails = error.response.data || error.message;
+            if (error.response.data && typeof error.response.data === 'object') {
+                errorBody.details = error.response.data.error || error.response.data;
+            } else {
+                errorBody.details = error.response.data || error.message;
+            }
+        } else if (error.message && error.message.includes('multipart: message too large')) {
+            errorBody.details = error.message;
         }
+        
         return {
             statusCode: errorStatus,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                error: '图像处理失败',
-                details: errorDetails,
-                errorName: error.name
-            })
+            body: JSON.stringify(errorBody)
         };
     }
 }; 
