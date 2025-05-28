@@ -134,14 +134,15 @@ exports.handler = async (event, context) => {
         const imageBuffer = Buffer.from(image_base64, 'base64');
         console.log('[aihubmix-native] Image buffer size:', imageBuffer.length);
         
-        // 创建multipart form data - 按照OpenAI API要求的格式
+        // 创建multipart form data - 按照AIhubmix官方示例的格式
         const formData = createMultipartFormData(
             {
                 'model': 'gpt-image-1',
                 'prompt': userPrompt || "请帮我把这张图片的背景完全移除，只保留主要物体，生成一张透明背景的PNG图片。要求：1. 精确抠图，边缘清晰 2. 背景完全透明 3. 保持主体物品的完整性和清晰度",
                 'n': n.toString(),
                 'size': size,
-                'response_format': 'b64_json'
+                'quality': 'high'
+                // 注意：不包含response_format参数，AIhubmix默认返回b64_json
             },
             {
                 'image': {
