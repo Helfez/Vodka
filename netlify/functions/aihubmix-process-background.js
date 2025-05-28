@@ -1,11 +1,13 @@
 // netlify/functions/aihubmix-process-background.js
-// const fetch = require('node-fetch'); // No longer needed for AI call
-// const FormData = require('form-data'); // No longer needed
-const { OpenAI, toFile } = require('openai'); // Import OpenAI SDK
-const cloudinary = require('cloudinary').v2;
-const { getStore } = require('@netlify/blobs');
+// import fetch from 'node-fetch'; // No longer needed for AI call
+// import FormData from 'form-data'; // No longer needed
+import { OpenAI, toFile } from 'openai'; // Import OpenAI SDK
+import cloudinary from 'cloudinary';
+import { getStore } from '@netlify/blobs';
 
-cloudinary.config({
+const cloudinaryV2 = cloudinary.v2;
+
+cloudinaryV2.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
@@ -17,7 +19,7 @@ const openai = new OpenAI({
     baseURL: 'https://aihubmix.com/v1',
 });
 
-exports.handler = async (event, context) => {
+export default async (event, context) => {
     console.log('[aihubmix-process-background] Function invoked.');
     
     let taskId;
@@ -36,7 +38,18 @@ exports.handler = async (event, context) => {
             };
         }
 
-        const store = getStore('aihubmix_tasks');
+        // 在 Functions v2 中，Netlify Blobs 应该自动工作，但如果不行，我们提供备用参数
+        let store;
+        try {
+            store = getStore('aihubmix_tasks'); // 首先尝试不带参数
+        } catch (error) {
+            console.log('[aihubmix-process-background] Fallback to manual siteID/token configuration');
+            store = getStore('aihubmix_tasks', {
+                siteID: process.env.NETLIFY_SITE_ID || context.clientContext?.site?.id,
+                token: process.env.NETLIFY_TOKEN || process.env.NETLIFY_ACCESS_TOKEN
+            }); // 手动提供 siteID 和 token
+        }
+        
         taskDataFromBlob = await store.get(taskId, { type: 'json' });
 
         if (!taskDataFromBlob) {
@@ -102,7 +115,7 @@ exports.handler = async (event, context) => {
         const processedImageBase64 = aihubmixResponse.data[0].b64_json;
         console.log(`[aihubmix-process-background] Task ${taskId}: Image processed by AIhubmix. Uploading to Cloudinary.`);
 
-        const cloudinaryUploadResponse = await cloudinary.uploader.upload(`data:image/png;base64,${processedImageBase64}`, {
+        const cloudinaryUploadResponse = await cloudinaryV2.uploader.upload(`data:image/png;base64,${processedImageBase64}`, {
             folder: 'aihubmix_processed',
             resource_type: 'image',
             timeout: 60000 // 1 minute timeout for upload
@@ -127,7 +140,17 @@ exports.handler = async (event, context) => {
         
         if (taskId && getStore) { // Ensure store can be accessed
             try {
-                const store = getStore('aihubmix_tasks');
+                // 在 Functions v2 中，Netlify Blobs 应该自动工作，但如果不行，我们提供备用参数
+                let store;
+                try {
+                    store = getStore('aihubmix_tasks'); // 首先尝试不带参数
+                } catch (storeError) {
+                    console.log('[aihubmix-process-background] Fallback to manual siteID/token configuration in error handler');
+                    store = getStore('aihubmix_tasks', {
+                        siteID: process.env.NETLIFY_SITE_ID || context.clientContext?.site?.id,
+                        token: process.env.NETLIFY_TOKEN || process.env.NETLIFY_ACCESS_TOKEN
+                    }); // 手动提供 siteID 和 token
+                }
                 // Check if taskDataFromBlob was fetched, to avoid overwriting good data with just an error status
                 const updatePayload = taskDataFromBlob ? { ...taskDataFromBlob } : { taskId }; 
                 await store.setJSON(taskId, { 

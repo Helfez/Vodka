@@ -1,8 +1,8 @@
-const { getStore } = require('@netlify/blobs');
-const { v4: uuidv4 } = require('uuid'); // For generating unique task IDs
-const fetch = require('node-fetch'); // For invoking the background function
+import { getStore } from '@netlify/blobs';
+import { v4 as uuidv4 } from 'uuid'; // For generating unique task IDs
+import fetch from 'node-fetch'; // For invoking the background function
 
-exports.handler = async (event, context) => {
+export default async (event, context) => {
     console.log('[aihubmix-native-trigger] Function invoked.');
 
     const corsHeaders = {
@@ -28,7 +28,6 @@ exports.handler = async (event, context) => {
     }
 
     const siteURL = context.clientContext?.site?.url || process.env.URL || 'http://localhost:8888';
-
 
     let requestBody;
     try {
@@ -59,7 +58,22 @@ exports.handler = async (event, context) => {
     }
     
     const taskId = uuidv4();
-    const store = getStore('aihubmix_tasks'); // 使用 getStore 而不是 getBlobStore
+    
+    // 在 Functions v2 中，Netlify Blobs 应该自动工作，但如果不行，我们提供备用参数
+    let store;
+    try {
+        store = getStore('aihubmix_tasks'); // 首先尝试不带参数
+    } catch (error) {
+        console.log('[aihubmix-native-trigger] Fallback to manual siteID/token configuration');
+        // 获取 Netlify 环境变量
+        const siteID = process.env.NETLIFY_SITE_ID || context.clientContext?.site?.id;
+        const token = process.env.NETLIFY_TOKEN || process.env.NETLIFY_ACCESS_TOKEN;
+        
+        store = getStore('aihubmix_tasks', { 
+            siteID: siteID,
+            token: token 
+        }); // 手动提供 siteID 和 token
+    }
 
     try {
         const taskData = {
