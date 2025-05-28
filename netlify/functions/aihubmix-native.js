@@ -12,19 +12,17 @@ export default async (event, context) => {
     };
 
     if (event.httpMethod === 'OPTIONS') {
-        return {
-            statusCode: 200,
-            headers: corsHeaders,
-            body: ''
-        };
+        return new Response('', {
+            status: 200,
+            headers: corsHeaders
+        });
     }
 
     if (event.httpMethod !== 'POST') {
-        return {
-            statusCode: 405,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: '只允许POST方法' })
-        };
+        return new Response(JSON.stringify({ error: '只允许POST方法' }), {
+            status: 405,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
     }
 
     const siteURL = context.clientContext?.site?.url || process.env.URL || 'http://localhost:8888';
@@ -34,11 +32,10 @@ export default async (event, context) => {
         requestBody = JSON.parse(event.body);
     } catch (error) {
         console.error('[aihubmix-native-trigger] Invalid JSON body:', error.message);
-        return {
-            statusCode: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: '无效的JSON请求体', details: error.message })
-        };
+        return new Response(JSON.stringify({ error: '无效的JSON请求体', details: error.message }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
     }
 
     const { 
@@ -50,11 +47,10 @@ export default async (event, context) => {
 
     if (!image_base64) {
         console.error('[aihubmix-native-trigger] Missing image_base64 parameter');
-        return {
-            statusCode: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: '请求体中缺少有效的图像Base64编码 (image_base64)' })
-        };
+        return new Response(JSON.stringify({ error: '请求体中缺少有效的图像Base64编码 (image_base64)' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
     }
     
     const taskId = uuidv4();
@@ -123,16 +119,15 @@ export default async (event, context) => {
             // store.setJSON(taskId, { ...taskData, status: 'trigger_failed', error: `Background invocation network error: ${err.message}` });
         });
 
-        return {
-            statusCode: 202, // Accepted for processing
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                success: true, 
-                taskId: taskId,
-                status: 'pending',
-                message: '任务已提交处理，请稍后查询状态。'
-            })
-        };
+        return new Response(JSON.stringify({ 
+            success: true, 
+            taskId: taskId,
+            status: 'pending',
+            message: '任务已提交处理，请稍后查询状态。'
+        }), {
+            status: 202, // Accepted for processing
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
 
     } catch (error) {
         console.error(`[aihubmix-native-trigger] Error processing request for task ${taskId}:`, error);
@@ -149,10 +144,9 @@ export default async (event, context) => {
                 console.error(`[aihubmix-native-trigger] Error updating blob for failed task ${taskId}:`, blobError);
             }
         }
-        return {
-            statusCode: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: '处理请求失败', details: error.message })
-        };
+        return new Response(JSON.stringify({ error: '处理请求失败', details: error.message }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
     }
-}; 
+};

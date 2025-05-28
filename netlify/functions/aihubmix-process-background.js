@@ -31,11 +31,10 @@ export default async (event, context) => {
 
         if (!taskId) {
             console.error('[aihubmix-process-background] Missing taskId in request body');
-            return {
-                statusCode: 400,
-                body: JSON.stringify({ error: 'Missing taskId' }),
+            return new Response(JSON.stringify({ error: 'Missing taskId' }), {
+                status: 400,
                 headers: { 'Content-Type': 'application/json' }
-            };
+            });
         }
 
         // 在 Functions v2 中，Netlify Blobs 应该自动工作，但如果不行，我们提供备用参数
@@ -55,11 +54,10 @@ export default async (event, context) => {
         if (!taskDataFromBlob) {
             console.error(`[aihubmix-process-background] Task ${taskId}: Not found in Blob store.`);
             // Don't update blob here as the task might not have been created properly
-            return {
-                statusCode: 404, // Not Found
-                body: JSON.stringify({ error: 'Task data not found in store' }),
+            return new Response(JSON.stringify({ error: 'Task data not found in store' }), {
+                status: 404, // Not Found
                 headers: { 'Content-Type': 'application/json' }
-            };
+            });
         }
 
         // Update status to processing in Blob store
@@ -105,11 +103,10 @@ export default async (event, context) => {
                 error: errorDetail,
                 failedAt: new Date().toISOString()
             });
-            return { // Return 200 OK as the background function itself completed its attempt
-                statusCode: 200, 
-                body: JSON.stringify({ message: 'Task failed due to API response, status updated in Blob' }),
+            return new Response(JSON.stringify({ message: 'Task failed due to API response, status updated in Blob' }), {
+                status: 200, 
                 headers: { 'Content-Type': 'application/json' }
-            };
+            });
         }
 
         const processedImageBase64 = aihubmixResponse.data[0].b64_json;
@@ -129,11 +126,10 @@ export default async (event, context) => {
             completedAt: new Date().toISOString()
         });
 
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ message: 'Task completed successfully and status updated in Blob' }),
+        return new Response(JSON.stringify({ message: 'Task completed successfully and status updated in Blob' }), {
+            status: 200,
             headers: { 'Content-Type': 'application/json' }
-        };
+        });
 
     } catch (error) {
         console.error(`[aihubmix-process-background] Task ${taskId || 'UNKNOWN'}: Error processing image:`, error);
@@ -165,10 +161,9 @@ export default async (event, context) => {
             }
         }
         // Return 200 OK for the background function invocation itself, error is logged & stored in Blob
-        return {
-            statusCode: 200, 
-            body: JSON.stringify({ message: 'Background task encountered an error, status updated in Blob', details: error.message }),
+        return new Response(JSON.stringify({ message: 'Background task encountered an error, status updated in Blob', details: error.message }), {
+            status: 200, 
             headers: { 'Content-Type': 'application/json' }
-        };
+        });
     }
 };
