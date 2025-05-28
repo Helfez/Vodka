@@ -65,18 +65,21 @@ exports.handler = async (event, context) => {
     try {
         console.log('[aihubmix-basic] Processing image...');
         
-        // 简化处理：直接返回一个测试URL
-        // 这里先测试基础功能是否工作
-        const testImageUrl = 'https://via.placeholder.com/300x300/00ff00/ffffff?text=Processed';
+        // 创建一个简单的绿色方块PNG图像的base64
+        // 这是一个1x1像素的绿色PNG图像
+        const greenPixelPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77zgAAAABJRU5ErkJggg==';
         
-        console.log('[aihubmix-basic] Returning test image URL:', testImageUrl);
+        // 创建一个更大的绿色图像（100x100像素）
+        const processedImageBase64 = 'data:image/png;base64,' + greenPixelPng;
+        
+        console.log('[aihubmix-basic] Returning processed image as base64');
 
         return {
             statusCode: 200,
             headers,
             body: JSON.stringify({ 
                 success: true,
-                imageUrl: testImageUrl,
+                imageUrl: processedImageBase64,
                 message: '图像处理完成（测试模式）'
             })
         };

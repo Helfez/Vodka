@@ -50,15 +50,15 @@ export class AihubmixService {
             requestBody.prompt = prompt;
         }
 
-        console.debug('[AihubmixService convertToSticker] Sending to basic function with body keys:', Object.keys(requestBody));
+        console.debug('[AihubmixService convertToSticker] Sending to native function with body keys:', Object.keys(requestBody));
 
         try {
             // 初始进度
             onProgress?.(10);
 
-            console.log('[AihubmixService convertToSticker] Calling aihubmix-basic function...');
+            console.log('[AihubmixService convertToSticker] Calling aihubmix-native function...');
             
-            const response = await fetch('/.netlify/functions/aihubmix-basic', {
+            const response = await fetch('/.netlify/functions/aihubmix-native', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
