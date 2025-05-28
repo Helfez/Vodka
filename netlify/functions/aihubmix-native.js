@@ -1,6 +1,35 @@
 const https = require('https');
 const { URL } = require('url');
 
+// 辅助函数：创建multipart/form-data
+function createMultipartFormData(fields, files) {
+    const boundary = '----formdata-' + Math.random().toString(36);
+    const chunks = [];
+    
+    // 添加文件字段 (必须先添加image字段)
+    for (const [key, file] of Object.entries(files)) {
+        chunks.push(Buffer.from(`--${boundary}\r\n`));
+        chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"; filename="${file.filename}"\r\n`));
+        chunks.push(Buffer.from(`Content-Type: ${file.contentType}\r\n\r\n`));
+        chunks.push(file.data); // 直接使用Buffer数据
+        chunks.push(Buffer.from('\r\n'));
+    }
+    
+    // 添加普通字段
+    for (const [key, value] of Object.entries(fields)) {
+        chunks.push(Buffer.from(`--${boundary}\r\n`));
+        chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"\r\n\r\n`));
+        chunks.push(Buffer.from(`${value}\r\n`));
+    }
+    
+    chunks.push(Buffer.from(`--${boundary}--\r\n`));
+    
+    return {
+        body: Buffer.concat(chunks),
+        contentType: `multipart/form-data; boundary=${boundary}`
+    };
+}
+
 // 辅助函数：发送HTTPS请求
 function httpsRequest(options, data) {
     return new Promise((resolve, reject) => {
@@ -101,19 +130,29 @@ exports.handler = async (event, context) => {
     try {
         console.log('[aihubmix-native] Processing image with AIhubmix Images Edit API...');
         
-        // 构建Images Edit API请求体 - 使用OpenAI格式
-        const apiRequestBody = {
-            model: "gpt-image-1",
-            image: image_base64, // 直接传递base64
-            prompt: userPrompt || "请帮我把这张图片的背景完全移除，只保留主要物体，生成一张透明背景的PNG图片。要求：1. 精确抠图，边缘清晰 2. 背景完全透明 3. 保持主体物品的完整性和清晰度",
-            n: n,
-            size: size,
-            quality: "high",
-            background: "transparent" // 关键：设置透明背景
-        };
+        // 将Base64转换为Buffer
+        const imageBuffer = Buffer.from(image_base64, 'base64');
+        console.log('[aihubmix-native] Image buffer size:', imageBuffer.length);
         
-        const requestData = JSON.stringify(apiRequestBody);
-        console.log('[aihubmix-native] Request data size:', requestData.length);
+        // 创建multipart form data - 按照OpenAI API要求的格式
+        const formData = createMultipartFormData(
+            {
+                'model': 'gpt-image-1',
+                'prompt': userPrompt || "请帮我把这张图片的背景完全移除，只保留主要物体，生成一张透明背景的PNG图片。要求：1. 精确抠图，边缘清晰 2. 背景完全透明 3. 保持主体物品的完整性和清晰度",
+                'n': n.toString(),
+                'size': size,
+                'response_format': 'b64_json'
+            },
+            {
+                'image': {
+                    filename: 'input_image.png',
+                    contentType: 'image/png',
+                    data: imageBuffer
+                }
+            }
+        );
+        
+        console.log('[aihubmix-native] Form data size:', formData.body.length);
         
         // 设置请求选项 - 使用Images Edit API端点
         const requestOptions = {
@@ -123,15 +162,15 @@ exports.handler = async (event, context) => {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(requestData)
+                'Content-Type': formData.contentType,
+                'Content-Length': formData.body.length
             }
         };
         
         console.log('[aihubmix-native] Sending request to AIhubmix Images Edit API...');
         
         // 发送请求
-        const response = await httpsRequest(requestOptions, requestData);
+        const response = await httpsRequest(requestOptions, formData.body);
         
         console.log('[aihubmix-native] Response status:', response.statusCode);
         
