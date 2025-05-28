@@ -20,11 +20,17 @@ export class API2DService implements ImageProcessingService {
   }
 
   /**
-   * 将图片转换为贴纸
-   * @param imageUrl 图片的URL (可以是data URL或public URL)
-   * @returns 返回处理后的图片的URL
+   * 将图片转换为贴纸（移除背景）
+   * @param imageUrl 图片的data URL
+   * @param prompt 可选的提示词
+   * @param onProgress 可选的进度回调函数
+   * @returns 返回处理后的图片的URL或data URL
    */
-  async convertToSticker(imageUrl: string): Promise<string> {
+  async convertToSticker(
+    imageUrl: string, 
+    prompt?: string, 
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
     try {
       console.log('开始调用API2D转换贴纸...');
       

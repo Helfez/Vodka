@@ -21,9 +21,15 @@ export class PixianService implements ImageProcessingService {
   /**
    * 将图片转换为贴纸（移除背景）
    * @param imageUrl 图片的data URL
-   * @returns 返回处理后的图片的data URL
+   * @param prompt 可选的提示词（Pixian不使用此参数）
+   * @param onProgress 可选的进度回调函数
+   * @returns 返回处理后的图片的URL或data URL
    */
-  async convertToSticker(imageUrl: string): Promise<string> { // Removed static
+  async convertToSticker(
+    imageUrl: string, 
+    prompt?: string, 
+    onProgress?: (progress: number) => void
+  ): Promise<string> {
     try {
       console.log('开始调用Pixian.ai转换贴纸...');
       

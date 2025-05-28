@@ -1,18 +1,12 @@
 const fetch = require('node-fetch');
-const FormData = require('form-data');
-const cloudinary = require('cloudinary').v2;
+// FormData and cloudinary are no longer directly used here for processing, moved to background
+const { getBlobStore } = require('@netlify/blobs');
+const { v4: uuidv4 } = require('uuid');
 
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-    secure: true,
-});
+// Cloudinary config is not needed here anymore as it's handled by the background function
 
 exports.handler = async (event, context) => {
-    console.log('[aihubmix-proxy] Function invoked.');
-    console.debug('[aihubmix-proxy] Received event:', JSON.stringify(event));
-    console.debug('[aihubmix-proxy] Received headers:', JSON.stringify(event.headers));
+    console.log('[aihubmix-proxy] Synchronous function invoked.');
 
     if (event.httpMethod !== 'POST') {
         console.warn(`[aihubmix-proxy] Invalid HTTP method: ${event.httpMethod}`);
@@ -23,22 +17,15 @@ exports.handler = async (event, context) => {
         };
     }
 
-    // Check for Cloudinary config first
-    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-        console.error('[aihubmix-proxy] Cloudinary environment variables not fully configured.');
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: 'Cloudinary configuration missing on server.' }),
-        };
-    }
+    // Environment variable checks for keys used by the background function can still be useful here
+    // as a preliminary check, or be solely in the background function.
+    // For now, let's assume they are checked in the background function.
 
     const apiKey = process.env.AIHUBMIX_API_KEY;
     if (!apiKey) {
-        console.error('[aihubmix-proxy] AIHUBMIX_API_KEY not set in environment variables.');
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: '服务器配置错误 (API Key missing)' }),
-        };
+        console.error('[aihubmix-proxy] AIHUBMIX_API_KEY not set. This will be needed by the background function.');
+        // Potentially return an error early, or let the background function fail and report.
+        // For now, we'll proceed and let the background function handle its own env var checks.
     }
 
     let requestBody;
@@ -62,102 +49,67 @@ exports.handler = async (event, context) => {
         };
     }
 
+    const taskId = uuidv4();
+    const store = getBlobStore('aihubmix_tasks'); // Same store name as in background and status functions
+
     try {
-        // Convert Base64 to Buffer
-        const imageBuffer = Buffer.from(image_base64, 'base64');
+        // Store initial pending status
+        await store.setJSON(taskId, {
+            status: 'pending',
+            taskId: taskId,
+            createdAt: new Date().toISOString(),
+            originalRequest: { // Optionally store some context about the request
+                prompt: userPrompt,
+                size: size,
+                n: n
+            }
+        });
+        console.log(`[aihubmix-proxy] Task ${taskId} created and status set to pending.`);
 
-        const form = new FormData();
-        form.append('image', imageBuffer, { filename: 'input_image.png', contentType: 'image/png' }); // Assuming PNG, adjust if needed
-        form.append('model', 'gpt-image-1');
-        // Use a specific prompt for background removal, or allow user to pass one
-        form.append('prompt', userPrompt || "Remove the background, making it transparent. Keep the main subject clear and high quality.");
-        form.append('n', n.toString());
-        form.append('size', size);
-        // form.append('response_format', 'b64_json'); // Removed to fix 400 error
+        // Asynchronously invoke the background function
+        // Construct the URL for the background function
+        // Note: The actual URL might depend on your Netlify site name if calling from outside Netlify's environment
+        // When a function calls another function within the same Netlify site, relative paths usually work.
+        const backgroundFunctionUrl = `${process.env.URL}/.netlify/functions/aihubmix-process-background`;
+        
+        console.log(`[aihubmix-proxy] Invoking background function at: ${backgroundFunctionUrl} for task ${taskId}`);
 
-        const apiUrl = 'https://aihubmix.com/v1/images/edits';
-
-        console.log(`[aihubmix-proxy] Calling Aihubmix API: ${apiUrl} with model gpt-image-1 (edits)`);
-        const aihubmixStartTime = Date.now(); // Log start time for Aihubmix
-
-        const response = await fetch(apiUrl, {
+        // We don't await this fetch call, making it non-blocking
+        fetch(backgroundFunctionUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                ...form.getHeaders(), // Important: form-data sets the Content-Type with boundary
+                'Content-Type': 'application/json',
+                // Potentially add a secret header for inter-function communication if needed for security
             },
-            body: form,
+            body: JSON.stringify({ image_base64, prompt: userPrompt, size, n, taskId }),
+        })
+        .then(res => {
+            if (!res.ok) {
+                // Log if the invocation itself failed, but the proxy has already responded to client
+                console.error(`[aihubmix-proxy] Failed to invoke background function for task ${taskId}. Status: ${res.status}. The task status in blob store might need manual update or will remain pending.`);
+                // Optionally, update blob store to reflect invocation failure if critical
+            } else {
+                console.log(`[aihubmix-proxy] Background function invoked successfully for task ${taskId}. It will process asynchronously.`);
+            }
+        })
+        .catch(err => {
+            // Log if the invocation itself failed due to network or other issues
+            console.error(`[aihubmix-proxy] Error invoking background function for task ${taskId}:`, err);
+            // Optionally, update blob store to reflect invocation failure
         });
 
-        const aihubmixEndTime = Date.now(); // Log end time for Aihubmix
-        console.log(`[aihubmix-proxy] Aihubmix API call took ${aihubmixEndTime - aihubmixStartTime} ms`);
-
-        const responseText = await response.text(); // Get raw text first for better error diagnosis
-
-        if (!response.ok) {
-            console.error(`[aihubmix-proxy] Aihubmix API Error: ${response.status} ${response.statusText}`, responseText);
-            let errorDetails = responseText;
-            try {
-                errorDetails = JSON.parse(responseText); // Try to parse if it's JSON
-            } catch (e) { /* Ignore if not JSON */ }
-            return {
-                statusCode: response.status,
-                body: JSON.stringify({ 
-                    error: 'Aihubmix API处理失败', 
-                    status: response.status,
-                    details: errorDetails 
-                }),
-            };
-        }
-
-        const data = JSON.parse(responseText); // Now parse as JSON
-
-        // Assuming the response structure is similar to OpenAI's DALL-E API for edits
-        // which returns an array of objects, each with a b64_json property.
-        if (data.data && data.data.length > 0 && data.data[0].b64_json) {
-            console.log('[aihubmix-proxy] Successfully processed image with gpt-image-1 (edits).');
-        } else {
-            console.error('[aihubmix-proxy] Unexpected response structure from Aihubmix (edits):', data);
-            return {
-                statusCode: 500,
-                body: JSON.stringify({ error: '从Aihubmix API响应中未能提取处理后的图像Base64编码', details: data }),
-            };
-        }
-
-        const processedBase64FromAihubmix = data.data[0].b64_json;
-
-        console.log('[aihubmix-proxy] Successfully processed image with gpt-image-1 (edits). Now uploading to Cloudinary.');
-        const cloudinaryStartTime = Date.now(); // Log start time for Cloudinary
-
-        // Upload to Cloudinary
-        const cloudinaryUploadResponse = await cloudinary.uploader.upload(
-            `data:image/png;base64,${processedBase64FromAihubmix}`,
-            {
-                folder: "whiteboard_app_processed_images", // Optional: specify a folder in Cloudinary
-                resource_type: "image"
-            }
-        );
-
-        const cloudinaryEndTime = Date.now(); // Log end time for Cloudinary
-        console.log(`[aihubmix-proxy] Cloudinary upload took ${cloudinaryEndTime - cloudinaryStartTime} ms`);
-
-        console.log('[aihubmix-proxy] Successfully uploaded to Cloudinary.');
-
+        // Return 202 Accepted to the client with the taskId
         return {
-            statusCode: 200,
-            body: JSON.stringify({ processedImageUrl: cloudinaryUploadResponse.secure_url }), // Return Cloudinary URL
+            statusCode: 202,
+            body: JSON.stringify({ message: '请求已接受，正在后台处理中。', taskId: taskId }),
         };
 
     } catch (error) {
-        console.error('[aihubmix-proxy] Error calling Aihubmix API (node-fetch/form-data):', error.name, error.message, error.stack);
-        // Check if the error is from Cloudinary or Aihubmix based on its properties or message
-        let errorSource = 'Aihubmix or Form-Data';
-        if (error.http_code && error.message && error.message.includes('Cloudinary')) { // Basic check for Cloudinary error structure
-            errorSource = 'Cloudinary';
-        }
+        console.error(`[aihubmix-proxy] Error in main proxy function for task ${taskId}:`, error);
+        // If error occurs before invoking background function, or during blob store set
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: `调用 ${errorSource} API 时出错`, details: error.message, error_obj: error }),
+            body: JSON.stringify({ error: '处理请求时发生内部错误。', details: error.message, taskId: taskId }), // Include taskId if generated
         };
     }
 };

@@ -456,6 +456,7 @@ const Whiteboard = ({
             position={stickerButtonPosition}
             onConvert={handleStickerConvert}
             onClose={() => setStickerButtonPosition(null)}
+            targetImage={stickerButtonPosition.target}
           />
         )}
       </div>
