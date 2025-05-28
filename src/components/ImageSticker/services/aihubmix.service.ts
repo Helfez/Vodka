@@ -26,86 +26,8 @@ export class AihubmixService {
         return AihubmixService.instance;
     }
 
-    private async _pollForTaskCompletion(taskId: string, onProgress?: (progress: number) => void): Promise<string> {
-        let attempts = 0;
-        while (attempts < MAX_POLLING_ATTEMPTS) {
-            attempts++;
-            
-            // 计算进度：20% (任务创建) + 60% (轮询过程) + 20% (完成)
-            const pollingProgress = 20 + (attempts / MAX_POLLING_ATTEMPTS) * 60;
-            onProgress?.(Math.min(pollingProgress, 80));
-            
-            console.log(`[AihubmixService _pollForTaskCompletion] Polling attempt ${attempts} for taskId: ${taskId}`);
-            try {
-                const response = await fetch(`/.netlify/functions/aihubmix-status?taskId=${taskId}`);
-                
-                if (!response.ok) {
-                    // If status function itself returns an error (e.g., 404 if task ID is wrong initially, or 500)
-                    const errorData = await response.json().catch(() => ({ message: 'Failed to parse status error response' }));
-                    console.error(`[AihubmixService _pollForTaskCompletion] Error fetching status for ${taskId}: ${response.status}`, errorData);
-                    // Depending on the error, we might want to retry or fail fast.
-                    // For a 404, it might mean the task wasn't created properly or the ID is wrong.
-                    if (response.status === 404) {
-                        throw new Error(`任务 (ID: ${taskId}) 未找到。可能尚未创建或ID错误。`);
-                    }
-                    // For other server errors, retry a few times.
-                    if (attempts >= MAX_POLLING_ATTEMPTS) {
-                         throw new Error(`获取任务状态失败 (ID: ${taskId})，状态码: ${response.status}. ${errorData.error || errorData.message}`);
-                    }
-                    await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL_MS));
-                    continue; // Retry
-                }
-
-                const statusData = await response.json();
-                console.log(`[AihubmixService _pollForTaskCompletion] Status for ${taskId}:`, statusData);
-
-                switch (statusData.status) {
-                    case 'completed':
-                        if (!statusData.imageUrl) {
-                            console.error(`[AihubmixService _pollForTaskCompletion] Task ${taskId} completed but imageUrl missing.`);
-                            throw new Error(`任务 ${taskId} 已完成，但图片URL丢失。`);
-                        }
-                        console.log(`[AihubmixService _pollForTaskCompletion] Task ${taskId} completed successfully. Image URL: ${statusData.imageUrl}`);
-                        onProgress?.(100);
-                        return statusData.imageUrl;
-                    case 'failed':
-                        console.error(`[AihubmixService _pollForTaskCompletion] Task ${taskId} failed:`, statusData.error);
-                        throw new Error(`图像处理失败 (任务ID: ${taskId}): ${statusData.error || '未知错误'}`);
-                    case 'pending':
-                    case 'processing': // Assuming 'processing' could be another intermediate state
-                        // Task is still processing, wait and poll again
-                        if (attempts >= MAX_POLLING_ATTEMPTS) {
-                            console.warn(`[AihubmixService _pollForTaskCompletion] Task ${taskId} timed out after ${attempts} attempts.`);
-                            throw new Error(`图像处理超时 (任务ID: ${taskId})。`);
-                        }
-                        await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL_MS));
-                        break; // Continue to next iteration of the while loop
-                    default:
-                        console.warn(`[AihubmixService _pollForTaskCompletion] Unknown status for ${taskId}: ${statusData.status}`);
-                        // Treat unknown status as a temporary issue and retry, or fail if attempts exhausted
-                        if (attempts >= MAX_POLLING_ATTEMPTS) {
-                            throw new Error(`收到未知的任务状态 (ID: ${taskId}): ${statusData.status}`);
-                        }
-                        await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL_MS));
-                        break;
-                }
-            } catch (error: any) {
-                // This catches network errors during fetch or errors from JSON parsing if not caught earlier
-                console.error(`[AihubmixService _pollForTaskCompletion] Error during polling for ${taskId} (attempt ${attempts}):`, error);
-                if (attempts >= MAX_POLLING_ATTEMPTS) {
-                    throw new Error(`轮询任务状态时发生错误 (ID: ${taskId}): ${error.message}`);
-                }
-                // Wait before retrying on generic errors too
-                await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL_MS));
-            }
-        }
-        // Should not be reached if MAX_POLLING_ATTEMPTS is effective in all paths
-        throw new Error(`图像处理已达到最大轮询次数但仍未完成 (任务ID: ${taskId})。`);
-    }
-
     /**
-     * Initiates image processing (e.g., remove background) by calling the aihubmix-proxy,
-     * then polls for completion and returns the URL of the processed image.
+     * 直接处理图像（同步方式），避免复杂的异步轮询
      * @param imageBase64 The Base64 encoded string of the image to be processed.
      * @param prompt Optional prompt for the Aihubmix API.
      * @param onProgress Optional callback for progress updates.
@@ -127,20 +49,20 @@ export class AihubmixService {
 
         const requestBody: { image_base64: string; prompt?: string; size?: string; n?: number } = {
             image_base64: base64Data,
-            // Default size and n can be set here or in the proxy/background function
-            // For now, let's assume proxy/background handles defaults if not provided.
         };
         if (prompt) {
             requestBody.prompt = prompt;
         }
 
-        console.debug('[AihubmixService convertToSticker] Sending to proxy with body keys:', Object.keys(requestBody));
+        console.debug('[AihubmixService convertToSticker] Sending to simple function with body keys:', Object.keys(requestBody));
 
         try {
             // 初始进度
             onProgress?.(10);
 
-            const initialResponse = await fetch('/.netlify/functions/aihubmix-proxy', {
+            console.log('[AihubmixService convertToSticker] Calling aihubmix-simple function...');
+            
+            const response = await fetch('/.netlify/functions/aihubmix-simple', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -148,32 +70,36 @@ export class AihubmixService {
                 body: JSON.stringify(requestBody),
             });
 
-            console.log('[AihubmixService convertToSticker] Raw initial response from proxy:', initialResponse);
+            console.log('[AihubmixService convertToSticker] Response status:', response.status);
 
-            if (initialResponse.status === 202) {
-                const responseData = await initialResponse.json();
-                console.log('[AihubmixService convertToSticker] Parsed 202 JSON response from proxy:', responseData);
-                if (responseData && responseData.taskId) {
-                    console.log(`[AihubmixService convertToSticker] Task ${responseData.taskId} accepted. Starting to poll.`);
-                    // 任务创建成功
-                    onProgress?.(20);
-                    // Start polling for the result with progress callback
-                    return await this._pollForTaskCompletion(responseData.taskId, onProgress);
-                } else {
-                    console.error('[AihubmixService convertToSticker] Proxy returned 202 but taskId missing:', responseData);
-                    throw new Error('代理接受了请求，但未返回任务ID。');
-                }
+            // 处理中进度
+            onProgress?.(50);
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+                console.error('[AihubmixService convertToSticker] API error response:', response.status, errorData);
+                throw new Error(`API请求失败，状态码 ${response.status}: ${errorData.error || errorData.message || '未知错误'}`);
+            }
+
+            const responseData = await response.json();
+            console.log('[AihubmixService convertToSticker] Response data:', responseData);
+
+            // 完成进度
+            onProgress?.(90);
+
+            if (responseData.success && responseData.imageUrl) {
+                console.log('[AihubmixService convertToSticker] Image processing completed successfully. Image URL:', responseData.imageUrl);
+                onProgress?.(100);
+                return responseData.imageUrl;
             } else {
-                // Handle other non-202 responses as errors (e.g., 400, 500 from the proxy itself)
-                const errorData = await initialResponse.json().catch(() => ({ message: 'Failed to parse error response from proxy on non-202 status' }));
-                console.error('[AihubmixService convertToSticker] Proxy error response (non-202):', initialResponse.status, errorData);
-                throw new Error(`代理API请求失败，状态码 ${initialResponse.status}: ${errorData.error || errorData.message || '未知代理错误'}`);
+                console.error('[AihubmixService convertToSticker] Unexpected response format:', responseData);
+                throw new Error(`处理失败: ${responseData.error || '未知错误'}`);
             }
 
         } catch (error: any) {
             console.error('[AihubmixService convertToSticker] Error in method:', error);
             const errorMessage = error.message || '贴纸转换过程中发生未知错误。';
-            return Promise.reject(new Error(errorMessage)); // Ensure a Promise.reject for proper error handling
+            return Promise.reject(new Error(errorMessage));
         }
     }
 
