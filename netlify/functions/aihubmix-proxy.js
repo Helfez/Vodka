@@ -71,7 +71,10 @@ exports.handler = async (event, context) => {
         console.log(`[aihubmix-proxy] Task ${taskId} created and status set to pending.`);
 
         // Construct the URL for the background function
-        const siteUrl = process.env.URL || process.env.DEPLOY_PRIME_URL || 'http://localhost:8888';
+        // Use the current request's origin to build the background function URL
+        const protocol = event.headers['x-forwarded-proto'] || 'https';
+        const host = event.headers.host;
+        const siteUrl = `${protocol}://${host}`;
         const backgroundFunctionUrl = `${siteUrl}/.netlify/functions/aihubmix-process-background`;
         
         console.log(`[aihubmix-proxy] Invoking background function at: ${backgroundFunctionUrl} for task ${taskId}`);

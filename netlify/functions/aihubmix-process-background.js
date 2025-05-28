@@ -24,7 +24,8 @@ exports.handler = async (event, context) => {
             console.error('[aihubmix-process-background] Missing taskId');
             return {
                 statusCode: 400,
-                body: JSON.stringify({ error: 'Missing taskId' })
+                body: JSON.stringify({ error: 'Missing taskId' }),
+                headers: { 'Content-Type': 'application/json' }
             };
         }
 
@@ -42,19 +43,29 @@ exports.handler = async (event, context) => {
         // Convert Base64 to Buffer
         const imageBuffer = Buffer.from(image_base64, 'base64');
 
+        // Create FormData instance
         const form = new FormData();
-        form.append('image', imageBuffer, { filename: 'input_image.png', contentType: 'image/png' });
+        form.append('image', imageBuffer, { 
+            filename: 'input_image.png', 
+            contentType: 'image/png' 
+        });
         form.append('model', 'gpt-image-1');
         form.append('prompt', userPrompt || "Remove the background, making it transparent. Keep the main subject clear and high quality.");
         form.append('n', n.toString());
         form.append('size', size);
 
         const apiUrl = 'https://aihubmix.com/v1/images/edits';
+        
+        // Get form headers
+        const formHeaders = form.getHeaders();
+        
+        console.log(`[aihubmix-process-background] Task ${taskId}: Sending request to Aihubmix API.`);
+        
         const aihubmixResponse = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${process.env.AIHUBMIX_API_KEY}`,
-                ...form.getHeaders(),
+                ...formHeaders,
             },
             body: form,
             timeout: 120000 // 2 minutes timeout
@@ -70,13 +81,16 @@ exports.handler = async (event, context) => {
             });
             return {
                 statusCode: 200,
-                body: JSON.stringify({ message: 'Task failed, status updated' })
+                body: JSON.stringify({ message: 'Task failed, status updated' }),
+                headers: { 'Content-Type': 'application/json' }
             };
         }
 
         const aihubmixData = await aihubmixResponse.json();
+        console.log(`[aihubmix-process-background] Task ${taskId}: Aihubmix response received.`);
+        
         if (!aihubmixData || !aihubmixData.data || !aihubmixData.data[0] || !aihubmixData.data[0].b64_json) {
-            console.error(`[aihubmix-process-background] Task ${taskId}: Invalid response structure from Aihubmix.`);
+            console.error(`[aihubmix-process-background] Task ${taskId}: Invalid response structure from Aihubmix.`, aihubmixData);
             await store.setJSON(taskId, { 
                 status: 'failed', 
                 error: 'Invalid response structure from Aihubmix.',
@@ -84,7 +98,8 @@ exports.handler = async (event, context) => {
             });
             return {
                 statusCode: 200,
-                body: JSON.stringify({ message: 'Task failed, status updated' })
+                body: JSON.stringify({ message: 'Task failed, status updated' }),
+                headers: { 'Content-Type': 'application/json' }
             };
         }
 
@@ -106,7 +121,8 @@ exports.handler = async (event, context) => {
 
         return {
             statusCode: 200,
-            body: JSON.stringify({ message: 'Task completed successfully' })
+            body: JSON.stringify({ message: 'Task completed successfully' }),
+            headers: { 'Content-Type': 'application/json' }
         };
 
     } catch (error) {
@@ -127,7 +143,8 @@ exports.handler = async (event, context) => {
 
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: 'Internal server error', details: error.message })
+            body: JSON.stringify({ error: 'Internal server error', details: error.message }),
+            headers: { 'Content-Type': 'application/json' }
         };
     }
 };
