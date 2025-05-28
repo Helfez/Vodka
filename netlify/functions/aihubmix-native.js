@@ -1,7 +1,9 @@
-const { OpenAI, toFile } = require('openai');
+const { getBlobStore } = require('@netlify/blobs');
+const { v4: uuidv4 } = require('uuid'); // For generating unique task IDs
+const fetch = require('node-fetch'); // For invoking the background function
 
 exports.handler = async (event, context) => {
-    console.log('[aihubmix-native-sdk] Function invoked.');
+    console.log('[aihubmix-native-trigger] Function invoked.');
 
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
@@ -25,26 +27,14 @@ exports.handler = async (event, context) => {
         };
     }
 
-    const apiKey = process.env.AIHUBMIX_API_KEY;
-    if (!apiKey) {
-        console.error('[aihubmix-native-sdk] AIHUBMIX_API_KEY not set.');
-        return {
-            statusCode: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ error: '服务器配置错误：缺少API密钥' })
-        };
-    }
+    const siteURL = context.clientContext?.site?.url || process.env.URL || 'http://localhost:8888';
 
-    const openai = new OpenAI({
-        apiKey: apiKey,
-        baseURL: 'https://aihubmix.com/v1',
-    });
 
     let requestBody;
     try {
         requestBody = JSON.parse(event.body);
     } catch (error) {
-        console.error('[aihubmix-native-sdk] Invalid JSON body:', error.message);
+        console.error('[aihubmix-native-trigger] Invalid JSON body:', error.message);
         return {
             statusCode: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -52,113 +42,103 @@ exports.handler = async (event, context) => {
         };
     }
 
-    const { image_base64 } = requestBody;
+    const { 
+        image_base64, 
+        prompt: userPrompt, // Use the user's prompt
+        n = 1,              // Default n to 1 for background processing unless specified
+        size = "1024x1024"  // Default size unless specified
+    } = requestBody;
+
     if (!image_base64) {
-        console.error('[aihubmix-native-sdk] Missing image_base64 parameter');
+        console.error('[aihubmix-native-trigger] Missing image_base64 parameter');
         return {
             statusCode: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             body: JSON.stringify({ error: '请求体中缺少有效的图像Base64编码 (image_base64)' })
         };
     }
+    
+    const taskId = uuidv4();
+    const store = getBlobStore('aihubmix_tasks'); // Ensure this matches the store name in process & status functions
 
     try {
-        console.log('[aihubmix-native-sdk] Processing image with STRICTLY hardcoded parameters...');
-
-        const imageBuffer = Buffer.from(image_base64, 'base64');
-        const imageFileUploadable = await toFile(imageBuffer, 'image.png', {
-            type: 'image/png',
-        });
-
-        const model = "gpt-image-1";
-        const prompt = "redesign poster of the movie [Black Swan], 3D cartoon, smooth render, bright tone, 2:3 portrait.";
-        const n = 2;
-        const size = "1024x1536";
-        const quality = "high";
-
-        console.log(`[aihubmix-native-sdk] Calling AIhubmix images.edit with fixed params: model=${model}, n=${n}, size=${size}, quality=${quality}`);
-
-        const response = await openai.images.edit({
-            model: model,
-            image: imageFileUploadable,
-            prompt: prompt,
-            n: n,
+        const taskData = {
+            taskId,
+            image_base64, // Store the full base64
+            prompt: userPrompt || "redesign poster of the movie [Black Swan], 3D cartoon, smooth render, bright tone, 2:3 portrait.", // Default prompt if not provided
+            n: parseInt(n, 10),
             size: size,
-            quality: quality
+            status: 'pending',
+            submittedAt: new Date().toISOString()
+        };
+
+        await store.setJSON(taskId, taskData);
+        console.log(`[aihubmix-native-trigger] Task ${taskId} stored in Blobs with status 'pending'.`);
+
+        // Asynchronously invoke the background processing function
+        // We directly call the function name. If a -background.js version exists, Netlify handles it.
+        // Otherwise, the function itself needs to be designed for potentially long execution or this call needs to be non-blocking.
+        // For true async, the background function should be named like 'aihubmix-process-background-background.js'
+        // and called via its specific background endpoint.
+        // Let's assume for now `aihubmix-process-background` is designed to be invoked and run in background.
+        
+        const backgroundFunctionURL = `${siteURL}/.netlify/functions/aihubmix-process-background`;
+        
+        console.log(`[aihubmix-native-trigger] Invoking background function at ${backgroundFunctionURL} for task ${taskId}`);
+
+        // Fire-and-forget invocation of the background function.
+        // We don't await this, as we want to return to the client immediately.
+        fetch(backgroundFunctionURL, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                // Potentially add a secret header for inter-function communication if needed
+            },
+            body: JSON.stringify({ taskId }) // Pass only the taskId
+        }).then(res => {
+            if (!res.ok) {
+                console.error(`[aihubmix-native-trigger] Error invoking background function for task ${taskId}. Status: ${res.status}`);
+                // Optionally, update blob store to reflect invocation failure
+                // store.setJSON(taskId, { ...taskData, status: 'trigger_failed', error: `Background invocation failed with status ${res.status}` });
+            } else {
+                console.log(`[aihubmix-native-trigger] Successfully invoked background function for task ${taskId}.`);
+            }
+        }).catch(err => {
+            console.error(`[aihubmix-native-trigger] Network error invoking background function for task ${taskId}:`, err);
+            // Optionally, update blob store
+            // store.setJSON(taskId, { ...taskData, status: 'trigger_failed', error: `Background invocation network error: ${err.message}` });
         });
-
-        console.log('[aihubmix-native-sdk] AIhubmix response received.');
-
-        if (!response || !response.data || !response.data[0]) {
-            console.error('[aihubmix-native-sdk] Invalid response structure from AIhubmix:', response);
-            return {
-                statusCode: 500,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ error: 'AIhubmix API返回了无效的响应格式' })
-            };
-        }
-
-        const imageDataItem = response.data[0];
-        let resultOutput = {};
-
-        if (imageDataItem.b64_json) {
-            resultOutput.imageUrl = `data:image/png;base64,${imageDataItem.b64_json}`;
-            console.log('[aihubmix-native-sdk] Image processed successfully with base64 data from item.');
-        } else if (imageDataItem.url) {
-            resultOutput.imageUrl = imageDataItem.url;
-            console.log('[aihubmix-native-sdk] Image processed successfully with URL from item:', imageDataItem.url);
-        } else {
-            console.log('[aihubmix-native-sdk] No b64_json or url found in the first image data item:', imageDataItem);
-            console.log('[aihubmix-native-sdk] Full response.data:', response.data);
-            return {
-                statusCode: 500,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    error: '未能生成处理后的图像',
-                    details: '响应中没有图像数据(b64_json or url)在第一个项目中',
-                    fullResponseData: response.data
-                })
-            };
-        }
-
-        resultOutput.allData = response.data;
 
         return {
-            statusCode: 200,
+            statusCode: 202, // Accepted for processing
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                success: true,
-                data: response.data,
-                message: '图像处理完成'
+                success: true, 
+                taskId: taskId,
+                status: 'pending',
+                message: '任务已提交处理，请稍后查询状态。'
             })
         };
 
     } catch (error) {
-        console.error('[aihubmix-native-sdk] Error processing image:', error);
-        let errorStatus = 500;
-        let errorBody = { 
-            error: '图像处理失败',
-            details: error.message,
-            errorName: error.name,
-            stack: error.stack
-        };
-        if (error.response) {
-            console.error('Error Response Status:', error.response.status);
-            console.error('Error Response Data:', error.response.data);
-            errorStatus = error.response.status || 500;
-            if (error.response.data && typeof error.response.data === 'object') {
-                errorBody.details = error.response.data.error || error.response.data;
-            } else {
-                errorBody.details = error.response.data || error.message;
+        console.error(`[aihubmix-native-trigger] Error processing request for task ${taskId}:`, error);
+        // If task creation failed before even invoking background, update blob for taskId if possible
+        if (taskId) {
+            try {
+                await store.setJSON(taskId, {
+                    taskId,
+                    status: 'failed',
+                    error: `Trigger function error: ${error.message}`,
+                    failedAt: new Date().toISOString()
+                });
+            } catch (blobError) {
+                console.error(`[aihubmix-native-trigger] Error updating blob for failed task ${taskId}:`, blobError);
             }
-        } else if (error.message && error.message.includes('multipart: message too large')) {
-            errorBody.details = error.message;
         }
-        
         return {
-            statusCode: errorStatus,
+            statusCode: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify(errorBody)
+            body: JSON.stringify({ error: '处理请求失败', details: error.message })
         };
     }
 }; 
