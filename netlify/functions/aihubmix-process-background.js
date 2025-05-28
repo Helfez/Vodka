@@ -13,12 +13,32 @@ cloudinary.config({
 
 exports.handler = async (event, context) => {
     console.log('[aihubmix-process-background] Function invoked.');
-    const { image_base64, prompt: userPrompt, size, n, taskId } = JSON.parse(event.body);
-
-    const store = getBlobStore('aihubmix_tasks');
-
+    
+    let taskId;
     try {
+        const requestBody = JSON.parse(event.body);
+        const { image_base64, prompt: userPrompt, size, n } = requestBody;
+        taskId = requestBody.taskId;
+
+        if (!taskId) {
+            console.error('[aihubmix-process-background] Missing taskId');
+            return {
+                statusCode: 400,
+                body: JSON.stringify({ error: 'Missing taskId' })
+            };
+        }
+
+        const store = getBlobStore('aihubmix_tasks');
+
+        // Update status to processing
+        await store.setJSON(taskId, {
+            status: 'processing',
+            taskId: taskId,
+            startedAt: new Date().toISOString()
+        });
+
         console.log(`[aihubmix-process-background] Task ${taskId}: Processing image with Aihubmix.`);
+        
         // Convert Base64 to Buffer
         const imageBuffer = Buffer.from(image_base64, 'base64');
 
@@ -37,34 +57,77 @@ exports.handler = async (event, context) => {
                 ...form.getHeaders(),
             },
             body: form,
+            timeout: 120000 // 2 minutes timeout
         });
 
         if (!aihubmixResponse.ok) {
             const errorBody = await aihubmixResponse.text();
             console.error(`[aihubmix-process-background] Task ${taskId}: Aihubmix API Error: ${aihubmixResponse.status}`, errorBody);
-            await store.setJSON(taskId, { status: 'failed', error: `Aihubmix API Error: ${aihubmixResponse.status} - ${errorBody}` });
-            return; // Important to exit after setting status
+            await store.setJSON(taskId, { 
+                status: 'failed', 
+                error: `Aihubmix API Error: ${aihubmixResponse.status} - ${errorBody}`,
+                failedAt: new Date().toISOString()
+            });
+            return {
+                statusCode: 200,
+                body: JSON.stringify({ message: 'Task failed, status updated' })
+            };
         }
 
         const aihubmixData = await aihubmixResponse.json();
         if (!aihubmixData || !aihubmixData.data || !aihubmixData.data[0] || !aihubmixData.data[0].b64_json) {
             console.error(`[aihubmix-process-background] Task ${taskId}: Invalid response structure from Aihubmix.`);
-            await store.setJSON(taskId, { status: 'failed', error: 'Invalid response structure from Aihubmix.' });
-            return;
+            await store.setJSON(taskId, { 
+                status: 'failed', 
+                error: 'Invalid response structure from Aihubmix.',
+                failedAt: new Date().toISOString()
+            });
+            return {
+                statusCode: 200,
+                body: JSON.stringify({ message: 'Task failed, status updated' })
+            };
         }
+
         const processedImageBase64 = aihubmixData.data[0].b64_json;
         console.log(`[aihubmix-process-background] Task ${taskId}: Image processed by Aihubmix. Uploading to Cloudinary.`);
 
         const cloudinaryUploadResponse = await cloudinary.uploader.upload(`data:image/png;base64,${processedImageBase64}`, {
             folder: 'aihubmix_processed',
             resource_type: 'image',
+            timeout: 60000 // 1 minute timeout for upload
         });
 
         console.log(`[aihubmix-process-background] Task ${taskId}: Image uploaded to Cloudinary: ${cloudinaryUploadResponse.secure_url}`);
-        await store.setJSON(taskId, { status: 'completed', imageUrl: cloudinaryUploadResponse.secure_url });
+        await store.setJSON(taskId, { 
+            status: 'completed', 
+            imageUrl: cloudinaryUploadResponse.secure_url,
+            completedAt: new Date().toISOString()
+        });
+
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ message: 'Task completed successfully' })
+        };
 
     } catch (error) {
         console.error(`[aihubmix-process-background] Task ${taskId}: Error processing image:`, error);
-        await store.setJSON(taskId, { status: 'failed', error: error.message });
+        
+        if (taskId) {
+            try {
+                const store = getBlobStore('aihubmix_tasks');
+                await store.setJSON(taskId, { 
+                    status: 'failed', 
+                    error: error.message,
+                    failedAt: new Date().toISOString()
+                });
+            } catch (storeError) {
+                console.error(`[aihubmix-process-background] Failed to update task status:`, storeError);
+            }
+        }
+
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: 'Internal server error', details: error.message })
+        };
     }
 };
