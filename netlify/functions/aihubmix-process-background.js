@@ -3,7 +3,7 @@
 // const FormData = require('form-data'); // No longer needed
 const { OpenAI, toFile } = require('openai'); // Import OpenAI SDK
 const cloudinary = require('cloudinary').v2;
-const { getBlobStore } = require('@netlify/blobs');
+const { getStore } = require('@netlify/blobs');
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -36,7 +36,7 @@ exports.handler = async (event, context) => {
             };
         }
 
-        const store = getBlobStore('aihubmix_tasks');
+        const store = getStore('aihubmix_tasks');
         taskDataFromBlob = await store.get(taskId, { type: 'json' });
 
         if (!taskDataFromBlob) {
@@ -125,9 +125,9 @@ exports.handler = async (event, context) => {
     } catch (error) {
         console.error(`[aihubmix-process-background] Task ${taskId || 'UNKNOWN'}: Error processing image:`, error);
         
-        if (taskId && getBlobStore) { // Ensure store can be accessed
+        if (taskId && getStore) { // Ensure store can be accessed
             try {
-                const store = getBlobStore('aihubmix_tasks');
+                const store = getStore('aihubmix_tasks');
                 // Check if taskDataFromBlob was fetched, to avoid overwriting good data with just an error status
                 const updatePayload = taskDataFromBlob ? { ...taskDataFromBlob } : { taskId }; 
                 await store.setJSON(taskId, { 

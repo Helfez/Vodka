@@ -1,4 +1,4 @@
-const { getBlobStore } = require('@netlify/blobs');
+const { getStore } = require('@netlify/blobs');
 const { v4: uuidv4 } = require('uuid'); // For generating unique task IDs
 const fetch = require('node-fetch'); // For invoking the background function
 
@@ -59,7 +59,7 @@ exports.handler = async (event, context) => {
     }
     
     const taskId = uuidv4();
-    const store = getBlobStore('aihubmix_tasks'); // Ensure this matches the store name in process & status functions
+    const store = getStore('aihubmix_tasks'); // 使用 getStore 而不是 getBlobStore
 
     try {
         const taskData = {

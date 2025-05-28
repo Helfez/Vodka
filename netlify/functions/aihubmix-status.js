@@ -1,5 +1,5 @@
 // netlify/functions/aihubmix-status.js
-const { getBlobStore } = require('@netlify/blobs');
+const { getStore } = require('@netlify/blobs');
 
 exports.handler = async (event, context) => {
     const taskId = event.queryStringParameters?.taskId;
@@ -12,7 +12,7 @@ exports.handler = async (event, context) => {
         };
     }
 
-    const store = getBlobStore('aihubmix_tasks');
+    const store = getStore('aihubmix_tasks');
 
     try {
         const taskData = await store.get(taskId, { type: 'json' });
