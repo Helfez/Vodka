@@ -87,7 +87,7 @@ exports.handler = async (event, context) => {
         };
     }
 
-    const { image_base64, prompt: userPrompt } = requestBody;
+    const { image_base64, prompt: userPrompt, size = "1024x1024", n = 1 } = requestBody;
 
     if (!image_base64) {
         console.error('[aihubmix-native] Missing image_base64 parameter');
@@ -99,33 +99,27 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        console.log('[aihubmix-native] Processing image with Aihubmix Responses API...');
+        console.log('[aihubmix-native] Processing image with AIhubmix Images Edit API...');
         
-        // 构建Responses API请求体
+        // 构建Images Edit API请求体 - 使用OpenAI格式
         const apiRequestBody = {
-            model: "gpt-4o-mini",
-            input: [
-                {
-                    type: "text",
-                    text: userPrompt || "Remove the background from this image, making it transparent. Keep the main subject clear and high quality."
-                },
-                {
-                    type: "image_url",
-                    image_url: {
-                        url: `data:image/png;base64,${image_base64}`
-                    }
-                }
-            ]
+            model: "gpt-image-1",
+            image: image_base64, // 直接传递base64
+            prompt: userPrompt || "请帮我把这张图片的背景完全移除，只保留主要物体，生成一张透明背景的PNG图片。要求：1. 精确抠图，边缘清晰 2. 背景完全透明 3. 保持主体物品的完整性和清晰度",
+            n: n,
+            size: size,
+            quality: "high",
+            background: "transparent" // 关键：设置透明背景
         };
         
         const requestData = JSON.stringify(apiRequestBody);
         console.log('[aihubmix-native] Request data size:', requestData.length);
         
-        // 设置请求选项 - 使用Responses API端点
+        // 设置请求选项 - 使用Images Edit API端点
         const requestOptions = {
             hostname: 'aihubmix.com',
             port: 443,
-            path: '/v1/responses',
+            path: '/v1/images/edits',
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
@@ -134,7 +128,7 @@ exports.handler = async (event, context) => {
             }
         };
         
-        console.log('[aihubmix-native] Sending request to Aihubmix Responses API...');
+        console.log('[aihubmix-native] Sending request to AIhubmix Images Edit API...');
         
         // 发送请求
         const response = await httpsRequest(requestOptions, requestData);
@@ -142,62 +136,71 @@ exports.handler = async (event, context) => {
         console.log('[aihubmix-native] Response status:', response.statusCode);
         
         if (response.statusCode !== 200) {
-            console.error('[aihubmix-native] Aihubmix API Error:', response.statusCode, response.body);
+            console.error('[aihubmix-native] AIhubmix API Error:', response.statusCode, response.body);
             return {
                 statusCode: 500,
                 headers,
                 body: JSON.stringify({ 
-                    error: `Aihubmix API错误: ${response.statusCode}`,
+                    error: `AIhubmix API错误: ${response.statusCode}`,
                     details: response.body
                 })
             };
         }
 
         const aihubmixData = JSON.parse(response.body);
-        console.log('[aihubmix-native] Aihubmix response received:', JSON.stringify(aihubmixData, null, 2));
+        console.log('[aihubmix-native] AIhubmix response received:', JSON.stringify(aihubmixData, null, 2));
         
-        // 处理Responses API的响应格式
-        if (!aihubmixData || !aihubmixData.choices || !aihubmixData.choices[0] || !aihubmixData.choices[0].message) {
-            console.error('[aihubmix-native] Invalid response structure from Aihubmix:', aihubmixData);
+        // 处理Images API的响应格式
+        if (!aihubmixData || !aihubmixData.data || !aihubmixData.data[0]) {
+            console.error('[aihubmix-native] Invalid response structure from AIhubmix:', aihubmixData);
             return {
                 statusCode: 500,
                 headers,
                 body: JSON.stringify({ 
-                    error: 'Aihubmix API返回了无效的响应格式'
+                    error: 'AIhubmix API返回了无效的响应格式'
                 })
             };
         }
 
-        const message = aihubmixData.choices[0].message;
+        const imageData = aihubmixData.data[0];
         
-        // 检查是否有图像内容
-        if (message.content && Array.isArray(message.content)) {
-            const imageContent = message.content.find(item => item.type === 'image');
-            if (imageContent && imageContent.image_url) {
-                console.log('[aihubmix-native] Image processed successfully');
-                return {
-                    statusCode: 200,
-                    headers,
-                    body: JSON.stringify({ 
-                        success: true,
-                        imageUrl: imageContent.image_url.url,
-                        message: '图像处理完成'
-                    })
-                };
-            }
+        // 检查是否有base64图像数据
+        if (imageData.b64_json) {
+            const imageDataUrl = `data:image/png;base64,${imageData.b64_json}`;
+            console.log('[aihubmix-native] Image processed successfully with base64 data');
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify({ 
+                    success: true,
+                    imageUrl: imageDataUrl,
+                    message: '图像处理完成'
+                })
+            };
         }
         
-        // 如果没有找到图像，返回文本响应
-        const textContent = typeof message.content === 'string' ? message.content : 
-                           (Array.isArray(message.content) ? message.content.find(item => item.type === 'text')?.text : '');
+        // 检查是否有URL
+        if (imageData.url) {
+            console.log('[aihubmix-native] Image processed successfully with URL:', imageData.url);
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify({ 
+                    success: true,
+                    imageUrl: imageData.url,
+                    message: '图像处理完成'
+                })
+            };
+        }
         
-        console.log('[aihubmix-native] No image in response, got text:', textContent);
+        console.log('[aihubmix-native] No image data found in response');
         return {
             statusCode: 500,
             headers,
             body: JSON.stringify({ 
                 error: '未能生成处理后的图像',
-                details: textContent || '响应中没有图像内容'
+                details: '响应中没有图像数据',
+                fullResponse: aihubmixData
             })
         };
 
