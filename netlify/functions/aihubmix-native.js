@@ -4,28 +4,28 @@ const { URL } = require('url');
 // 辅助函数：创建multipart/form-data
 function createMultipartFormData(fields, files) {
     const boundary = '----formdata-' + Math.random().toString(36);
-    let body = '';
+    const chunks = [];
     
     // 添加普通字段
     for (const [key, value] of Object.entries(fields)) {
-        body += `--${boundary}\r\n`;
-        body += `Content-Disposition: form-data; name="${key}"\r\n\r\n`;
-        body += `${value}\r\n`;
+        chunks.push(Buffer.from(`--${boundary}\r\n`));
+        chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"\r\n\r\n`));
+        chunks.push(Buffer.from(`${value}\r\n`));
     }
     
     // 添加文件字段
     for (const [key, file] of Object.entries(files)) {
-        body += `--${boundary}\r\n`;
-        body += `Content-Disposition: form-data; name="${key}"; filename="${file.filename}"\r\n`;
-        body += `Content-Type: ${file.contentType}\r\n\r\n`;
-        body += file.data;
-        body += '\r\n';
+        chunks.push(Buffer.from(`--${boundary}\r\n`));
+        chunks.push(Buffer.from(`Content-Disposition: form-data; name="${key}"; filename="${file.filename}"\r\n`));
+        chunks.push(Buffer.from(`Content-Type: ${file.contentType}\r\n\r\n`));
+        chunks.push(file.data); // 直接使用Buffer数据
+        chunks.push(Buffer.from('\r\n'));
     }
     
-    body += `--${boundary}--\r\n`;
+    chunks.push(Buffer.from(`--${boundary}--\r\n`));
     
     return {
-        body: Buffer.from(body, 'binary'),
+        body: Buffer.concat(chunks),
         contentType: `multipart/form-data; boundary=${boundary}`
     };
 }
@@ -51,6 +51,11 @@ function httpsRequest(options, data) {
         
         req.on('error', (error) => {
             reject(error);
+        });
+        
+        req.setTimeout(25000, () => {
+            req.destroy();
+            reject(new Error('Request timeout'));
         });
         
         if (data) {
@@ -127,6 +132,7 @@ exports.handler = async (event, context) => {
         
         // 将Base64转换为Buffer
         const imageBuffer = Buffer.from(image_base64, 'base64');
+        console.log('[aihubmix-native] Image buffer size:', imageBuffer.length);
         
         // 创建multipart form data
         const formData = createMultipartFormData(
@@ -145,6 +151,8 @@ exports.handler = async (event, context) => {
             }
         );
         
+        console.log('[aihubmix-native] Form data size:', formData.body.length);
+        
         // 设置请求选项
         const requestOptions = {
             hostname: 'aihubmix.com',
@@ -155,14 +163,15 @@ exports.handler = async (event, context) => {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': formData.contentType,
                 'Content-Length': formData.body.length
-            },
-            timeout: 25000
+            }
         };
         
         console.log('[aihubmix-native] Sending request to Aihubmix API...');
         
         // 发送请求
         const response = await httpsRequest(requestOptions, formData.body);
+        
+        console.log('[aihubmix-native] Response status:', response.statusCode);
         
         if (response.statusCode !== 200) {
             console.error('[aihubmix-native] Aihubmix API Error:', response.statusCode, response.body);
