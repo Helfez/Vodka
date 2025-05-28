@@ -78,7 +78,7 @@ export default async (request, context) => {
         const taskData = {
             taskId,
             image_base64, // Store the full base64
-            prompt: userPrompt || "redesign poster of the movie [Black Swan], 3D cartoon, smooth render, bright tone, 2:3 portrait.", // Default prompt if not provided
+            prompt: userPrompt || "Remove the background, making it transparent. Keep the main subject clear and high quality.", // Default prompt if not provided
             n: parseInt(n, 10),
             size: size,
             status: 'pending',

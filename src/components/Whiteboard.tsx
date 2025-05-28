@@ -9,6 +9,8 @@ import { ProcessedImage } from './ImageUpload/ImageProcessor';
 import { PhotoEffect } from './ImageUpload/PhotoEffect/PhotoEffect';
 import { FloatingButton } from './ImageSticker/components/FloatingButton';
 import { FloatingButtonPosition } from './ImageSticker/services/types';
+import { AIGenerationPanel } from './AIGeneration/AIGenerationPanel';
+import { LogViewer } from './LogViewer/LogViewer';
 
 // Type alias for Fabric.js Canvas instance with custom properties if any
 // (Currently, freeDrawingBrush is a standard property but explicitly typed for clarity)
@@ -65,6 +67,13 @@ const Whiteboard = ({
   // State for sticker button visibility and position
   const [stickerButtonPosition, setStickerButtonPosition] = useState<FloatingButtonPosition | null>(null);
 
+  // State for AI generation panel
+  const [isAIGenerationOpen, setIsAIGenerationOpen] = useState(false);
+  const [canvasSnapshot, setCanvasSnapshot] = useState<string>('');
+
+  // State for log viewer
+  const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
+
   // --- Callbacks --- 
 
   // Callback to record the current canvas state for undo history
@@ -118,6 +127,164 @@ const Whiteboard = ({
       }
     });
   }, [setHistory, fabricCanvasRef, brushSize, brushColor, initialIsDrawingMode]); // Removed 'history' from deps
+
+  // 处理AI生成面板打开
+  const handleOpenAIGeneration = useCallback(() => {
+    console.log('[Whiteboard handleOpenAIGeneration] === AI生成流程开始 ===');
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) {
+      console.error('[Whiteboard handleOpenAIGeneration] ❌ Canvas不可用，无法生成快照');
+      return;
+    }
+
+    try {
+      console.log('[Whiteboard handleOpenAIGeneration] 📊 画布信息:');
+      console.log('  - 画布尺寸:', canvas.getWidth(), 'x', canvas.getHeight());
+      console.log('  - 对象数量:', canvas.getObjects().length);
+      console.log('  - 背景色:', canvas.backgroundColor);
+      
+      // 获取画布快照
+      console.log('[Whiteboard handleOpenAIGeneration] 📸 开始生成画布快照...');
+      const startTime = performance.now();
+      
+      const dataURL = canvas.toDataURL({
+        format: 'png',
+        quality: 0.8,
+        multiplier: 1
+      });
+      
+      const endTime = performance.now();
+      const snapshotSize = Math.round(dataURL.length / 1024); // KB
+      console.log('[Whiteboard handleOpenAIGeneration] ✅ 快照生成完成:');
+      console.log('  - 耗时:', Math.round(endTime - startTime), 'ms');
+      console.log('  - 大小:', snapshotSize, 'KB');
+      console.log('  - 格式:', dataURL.substring(0, 30) + '...');
+      
+      // 自动下载PNG文件
+      console.log('[Whiteboard handleOpenAIGeneration] 💾 开始下载PNG文件...');
+      try {
+        const link = document.createElement('a');
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `whiteboard-snapshot-${timestamp}.png`;
+        
+        link.href = dataURL;
+        link.download = filename;
+        link.style.display = 'none';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log('[Whiteboard handleOpenAIGeneration] ✅ PNG文件下载完成:', filename);
+      } catch (downloadError) {
+        console.error('[Whiteboard handleOpenAIGeneration] ❌ PNG下载失败:', downloadError);
+      }
+      
+      setCanvasSnapshot(dataURL);
+      setIsAIGenerationOpen(true);
+      console.log('[Whiteboard handleOpenAIGeneration] 🎨 AI生成面板已打开');
+      console.log('[Whiteboard handleOpenAIGeneration] === AI生成流程准备完成 ===');
+    } catch (error) {
+      console.error('[Whiteboard handleOpenAIGeneration] ❌ 快照生成失败:', error);
+      console.error('  - 错误类型:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('  - 错误消息:', error instanceof Error ? error.message : String(error));
+      console.error('  - 错误堆栈:', error instanceof Error ? error.stack : 'N/A');
+    }
+  }, []);
+
+  // 处理AI生成的图片
+  const handleAIImageGenerated = useCallback((imageUrl: string) => {
+    console.log('[Whiteboard handleAIImageGenerated] === AI图片集成开始 ===');
+    console.log('[Whiteboard handleAIImageGenerated] 📥 接收到图片URL:', imageUrl.substring(0, 50) + '...');
+    
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) {
+      console.error('[Whiteboard handleAIImageGenerated] ❌ Canvas不可用，无法添加图片');
+      return;
+    }
+
+    console.log('[Whiteboard handleAIImageGenerated] 🖼️ 开始加载图片...');
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    const loadStartTime = performance.now();
+    
+    img.onload = () => {
+      const loadEndTime = performance.now();
+      console.log('[Whiteboard handleAIImageGenerated] ✅ 图片加载完成:');
+      console.log('  - 加载耗时:', Math.round(loadEndTime - loadStartTime), 'ms');
+      console.log('  - 图片尺寸:', img.width, 'x', img.height);
+      
+      try {
+        console.log('[Whiteboard handleAIImageGenerated] 🎯 计算图片位置...');
+        const canvasCenter = {
+          x: canvas.getWidth() / 2,
+          y: canvas.getHeight() / 2
+        };
+        const imagePosition = {
+          x: canvasCenter.x - img.width / 4,
+          y: canvasCenter.y - img.height / 4
+        };
+        
+        console.log('[Whiteboard handleAIImageGenerated] 📍 图片位置信息:');
+        console.log('  - 画布中心:', canvasCenter);
+        console.log('  - 图片位置:', imagePosition);
+        console.log('  - 缩放比例: 0.5');
+
+        const fabricImage = new fabric.Image(img, {
+          left: imagePosition.x,
+          top: imagePosition.y,
+          scaleX: 0.5,
+          scaleY: 0.5,
+          selectable: true,
+          hasControls: true,
+          evented: true
+        });
+
+        console.log('[Whiteboard handleAIImageGenerated] ➕ 添加图片到画布...');
+        canvas.add(fabricImage);
+        canvas.setActiveObject(fabricImage);
+        canvas.renderAll();
+
+        console.log('[Whiteboard handleAIImageGenerated] 💾 记录历史状态...');
+        // 记录状态用于撤销
+        requestAnimationFrame(() => {
+          const historyStartTime = performance.now();
+          const currentState: DrawingState = {
+            canvasState: JSON.stringify(canvas.toJSON()),
+            timestamp: Date.now()
+          };
+
+          setHistory(prev => {
+            const newHistory = [...prev, currentState];
+            if (newHistory.length > 20) {
+              newHistory.shift();
+            }
+            const historyEndTime = performance.now();
+            console.log('[Whiteboard handleAIImageGenerated] ✅ 历史状态已记录:');
+            console.log('  - 序列化耗时:', Math.round(historyEndTime - historyStartTime), 'ms');
+            console.log('  - 历史长度:', newHistory.length);
+            return newHistory;
+          });
+        });
+
+        console.log('[Whiteboard handleAIImageGenerated] ✅ AI图片集成完成');
+        console.log('[Whiteboard handleAIImageGenerated] === AI图片集成结束 ===');
+      } catch (error) {
+        console.error('[Whiteboard handleAIImageGenerated] ❌ 图片添加到画布失败:', error);
+        console.error('  - 错误类型:', error instanceof Error ? error.constructor.name : typeof error);
+        console.error('  - 错误消息:', error instanceof Error ? error.message : String(error));
+      }
+    };
+
+    img.onerror = (error) => {
+      console.error('[Whiteboard handleAIImageGenerated] ❌ 图片加载失败:', error);
+      console.error('  - 图片URL:', imageUrl);
+      console.error('  - 加载耗时:', Math.round(performance.now() - loadStartTime), 'ms');
+    };
+
+    img.src = imageUrl;
+  }, []);
 
   // --- Effects --- 
 
@@ -185,6 +352,11 @@ const Whiteboard = ({
         e.preventDefault(); // Prevent browser's default undo action
         handleUndo(); // handleUndo is now a stable useCallback
       }
+      // Ctrl/Cmd + G 打开AI生成面板
+      if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+        e.preventDefault();
+        handleOpenAIGeneration();
+      }
     };
 
     // Attach event listeners to the current canvas instance and window
@@ -209,7 +381,7 @@ const Whiteboard = ({
       // Note: Canvas disposal itself is handled if width/height change (at the start of this effect)
       // or on component unmount (in a separate effect).
     };
-  }, [width, height, initialIsDrawingMode, brushSize, brushColor, handleUndo, recordState]); // Dependencies that manage canvas and its core behavior
+  }, [width, height, initialIsDrawingMode, brushSize, brushColor, handleUndo, recordState, handleOpenAIGeneration]); // Dependencies that manage canvas and its core behavior
 
   // Effect for setting the initial history, runs once after canvas is ready and history is empty
   useEffect(() => {
@@ -322,30 +494,50 @@ const Whiteboard = ({
 
   // 处理图片上传
   const handleImageProcessed = useCallback(async (processedImage: ProcessedImage) => {
-    console.log('[Whiteboard handleImageProcessed] Image processed. Dimensions:', processedImage.width, 'x', processedImage.height);
+    console.log('[Whiteboard handleImageProcessed] === 图片上传处理开始 ===');
+    console.log('[Whiteboard handleImageProcessed] 📊 图片信息:');
+    console.log('  - 尺寸:', processedImage.width, 'x', processedImage.height);
+    console.log('  - 数据大小:', Math.round(processedImage.dataUrl.length / 1024), 'KB');
+    
     if (!fabricCanvasRef.current || !clickPosition) {
-        console.error('[Whiteboard handleImageProcessed] Canvas or clickPosition not available.');
+        console.error('[Whiteboard handleImageProcessed] ❌ Canvas或点击位置不可用');
+        console.error('  - Canvas可用:', !!fabricCanvasRef.current);
+        console.error('  - 点击位置:', clickPosition);
         return;
     }
 
     const canvas = fabricCanvasRef.current;
+    console.log('[Whiteboard handleImageProcessed] 📍 放置位置:', clickPosition);
     
     const img = new Image();
+    const loadStartTime = performance.now();
     
     img.onload = () => {
+      const loadEndTime = performance.now();
+      console.log('[Whiteboard handleImageProcessed] ✅ 图片加载完成，耗时:', Math.round(loadEndTime - loadStartTime), 'ms');
+      
+      const imagePosition = {
+        x: clickPosition.x - processedImage.width / 2,
+        y: clickPosition.y - processedImage.height / 2
+      };
+      
+      console.log('[Whiteboard handleImageProcessed] 🎯 计算最终位置:', imagePosition);
+
       const fabricImage = new fabric.Image(img, {
-        left: clickPosition.x - processedImage.width / 2,
-        top: clickPosition.y - processedImage.height / 2,
+        left: imagePosition.x,
+        top: imagePosition.y,
         selectable: false,
         hasControls: false,
         evented: true
       });
 
       // 先添加到画布
+      console.log('[Whiteboard handleImageProcessed] ➕ 添加图片到画布...');
       canvas.add(fabricImage);
 
       // 应用照片效果
       try {
+        console.log('[Whiteboard handleImageProcessed] ✨ 应用照片效果...');
         PhotoEffect.applyPhotoEffect(fabricImage, {
           animation: {
             initial: {
@@ -372,6 +564,7 @@ const Whiteboard = ({
 
         // 监听选中事件
         fabricImage.on('selected', () => {
+          console.log('[Whiteboard handleImageProcessed] 🎯 图片被选中');
           const bounds = fabricImage.getBoundingRect();
           setStickerButtonPosition({
             x: bounds.left + bounds.width / 2,
@@ -382,17 +575,21 @@ const Whiteboard = ({
 
         // 监听取消选中事件
         fabricImage.on('deselected', () => {
+          console.log('[Whiteboard handleImageProcessed] ⭕ 图片取消选中');
           setStickerButtonPosition(null);
         });
 
+        console.log('[Whiteboard handleImageProcessed] ✅ 照片效果应用完成');
       } catch (error: any) {
-        console.error('[Whiteboard handleImageProcessed] Error applying photo effect or adding image to canvas:', error);
+        console.error('[Whiteboard handleImageProcessed] ❌ 照片效果应用失败:', error);
       } finally {
         canvas.renderAll();
       }
 
       // 记录状态用于撤销
+      console.log('[Whiteboard handleImageProcessed] 💾 记录历史状态...');
       requestAnimationFrame(() => {
+        const historyStartTime = performance.now();
         const currentState: DrawingState = {
           canvasState: JSON.stringify(canvas.toJSON()),
           timestamp: Date.now()
@@ -403,13 +600,17 @@ const Whiteboard = ({
           if (newHistory.length > 20) {
             newHistory.shift();
           }
+          const historyEndTime = performance.now();
+          console.log('[Whiteboard handleImageProcessed] ✅ 历史状态记录完成，耗时:', Math.round(historyEndTime - historyStartTime), 'ms');
           return newHistory;
         });
       });
 
       // 关闭菜单
+      console.log('[Whiteboard handleImageProcessed] 🔄 清理UI状态...');
       setMenuPosition(null);
       setClickPosition(null);
+      console.log('[Whiteboard handleImageProcessed] === 图片上传处理完成 ===');
     };
 
     img.src = processedImage.dataUrl;
@@ -428,6 +629,25 @@ const Whiteboard = ({
           }
         }}
       />
+      
+      {/* AI生成按钮 */}
+      <div className="ai-generation-trigger">
+        <button 
+          className="ai-generation-button"
+          onClick={handleOpenAIGeneration}
+          title="AI图片生成 (Ctrl+G)"
+        >
+          🎨 AI生成
+        </button>
+        <button 
+          className="log-viewer-button"
+          onClick={() => setIsLogViewerOpen(true)}
+          title="查看系统日志"
+        >
+          📊 日志
+        </button>
+      </div>
+
       <div 
         className="whiteboard-container"
         onContextMenu={handleContextMenu}
@@ -460,6 +680,20 @@ const Whiteboard = ({
           />
         )}
       </div>
+
+      {/* AI生成面板 */}
+      <AIGenerationPanel
+        isOpen={isAIGenerationOpen}
+        onClose={() => setIsAIGenerationOpen(false)}
+        canvasSnapshot={canvasSnapshot}
+        onImageGenerated={handleAIImageGenerated}
+      />
+
+      {/* 日志查看器 */}
+      <LogViewer
+        isOpen={isLogViewerOpen}
+        onClose={() => setIsLogViewerOpen(false)}
+      />
     </div>
   );
 };
