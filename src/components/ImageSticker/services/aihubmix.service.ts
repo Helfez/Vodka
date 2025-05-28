@@ -106,7 +106,7 @@ export class AihubmixService {
      * @returns 处理完成的图像URL
      */
     private async pollTaskStatus(taskId: string, onProgress?: (progress: number) => void): Promise<string> {
-        const maxAttempts = 60; // 最多轮询60次
+        const maxAttempts = 120; // 增加到120次轮询（4分钟）
         const pollInterval = 2000; // 每2秒轮询一次
         let attempts = 0;
 
@@ -124,8 +124,13 @@ export class AihubmixService {
                 const statusData = await statusResponse.json();
                 console.log('[AihubmixService pollTaskStatus] Status data:', statusData);
 
-                // 更新进度
-                const progressValue = 30 + (attempts / maxAttempts) * 60; // 30% 到 90%
+                // 更新进度 - 根据状态和轮询次数动态计算
+                let progressValue = 30; // 基础进度30%
+                if (statusData.status === 'processing') {
+                    progressValue = 50 + (attempts / maxAttempts) * 40; // 50% 到 90%
+                } else if (statusData.status === 'pending') {
+                    progressValue = 30 + (attempts / maxAttempts) * 20; // 30% 到 50%
+                }
                 onProgress?.(Math.min(progressValue, 90));
 
                 switch (statusData.status) {
@@ -144,8 +149,11 @@ export class AihubmixService {
                         throw new Error(`图像处理失败: ${errorMsg}`);
 
                     case 'pending':
+                        console.log(`[AihubmixService pollTaskStatus] Task status: ${statusData.status}, AI处理队列中...`);
+                        break;
+
                     case 'processing':
-                        console.log(`[AihubmixService pollTaskStatus] Task status: ${statusData.status}, continuing to poll...`);
+                        console.log(`[AihubmixService pollTaskStatus] Task status: ${statusData.status}, AI正在处理图像...`);
                         break;
 
                     default:
@@ -176,7 +184,7 @@ export class AihubmixService {
         }
 
         // 超时
-        throw new Error('图像处理超时，请稍后重试');
+        throw new Error(`图像处理超时（已等待${maxAttempts * pollInterval / 1000}秒），AI服务可能繁忙，请稍后重试`);
     }
 
     public async compressImage(dataUrl: string, maxWidth: number, quality: number): Promise<string> {
