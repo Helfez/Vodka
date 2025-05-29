@@ -75,21 +75,7 @@ const Whiteboard = ({
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
 
   // State for AI prompt sidebar
-  const [aiPrompt, setAiPrompt] = useState<string>('');
   const [isPromptSidebarOpen, setIsPromptSidebarOpen] = useState(false);
-  const [systemPrompt, setSystemPrompt] = useState<string>(`You are a professional prompt-generation assistant specialized in collectible vinyl toy (潮玩) design. You are strictly limited to tasks within the domain of toy and figure design, and must never deviate from that scope.
-
-## Primary Task:
-Analyze the user's whiteboard sketch, which may include images, annotations, or doodles, and generate a high-quality English prompt suitable for image generation models (such as DALL·E 3). This prompt will be used to produce a rendering of the collectible figure.
-
-## Strict Design Constraints:
-1. The design must describe a collectible character or creature suitable for full-color one-piece 3D printing at approximately 8cm in height.
-2. All design choices must consider real-world 3D printing feasibility at 8cm scale — no thin, fragile, or floating structures.
-3. The prompt must **not include any environment, scenery, background**, or abstract artistic elements — only the character or creature is allowed.
-4. The figure must have a distinct and recognizable **style or theme** (e.g., whale-inspired, bio-mechanical, cute sci-fi).
-5. The prompt must be **clear and structured**, describing the pose, silhouette, color scheme, and visual language of the design.
-6. The prompt must **not** contain vague or overly broad stylistic descriptions.
-7. The expected output is an image with a **transparent background**, suitable for rendering and modeling use.`);
 
   // --- Callbacks --- 
 
@@ -730,36 +716,7 @@ Analyze the user's whiteboard sketch, which may include images, annotations, or 
               </button>
             </div>
             <div className="sidebar-content">
-              {/* System Prompt 编辑器 */}
-              <div className="system-prompt-section">
-                <h4>🎯 System Prompt 编辑</h4>
-                <textarea
-                  value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
-                  placeholder="输入System Prompt..."
-                  rows={8}
-                  className="system-prompt-textarea"
-                />
-                
-                {/* 分析按钮 */}
-                <button 
-                  className="analyze-button"
-                  onClick={handleOpenAIGeneration}
-                  title="使用当前System Prompt分析画板"
-                >
-                  🚀 开始分析
-                </button>
-              </div>
-
-              {/* AI分析结果 */}
-              {aiPrompt && (
-                <div className="prompt-display">
-                  <h4>📝 AI分析结果 (生图Prompt):</h4>
-                  <div className="prompt-text">
-                    <pre>{aiPrompt}</pre>
-                  </div>
-                </div>
-              )}
+              <p>AI分析工具界面</p>
             </div>
           </div>
         )}
