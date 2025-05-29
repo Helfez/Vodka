@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { AihubmixVisionService } from '../ImageSticker/services/aihubmix-vision.service';
 import { AihubmixDalleService } from '../ImageSticker/services/aihubmix-dalle.service';
 import './AIGenerationPanel.css';
