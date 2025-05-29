@@ -142,6 +142,60 @@
   overflow-y: auto;
 }
 
+/* System Prompt 编辑区域 */
+.system-prompt-section {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.system-prompt-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.system-prompt-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  resize: vertical;
+  min-height: 200px;
+  line-height: 1.5;
+  background: white;
+  transition: border-color 0.2s ease;
+  margin-bottom: 12px;
+}
+
+.system-prompt-textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.analyze-button {
+  width: 100%;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.analyze-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
 .prompt-display h4 {
   margin: 0 0 12px 0;
   font-size: 1rem;
@@ -154,7 +208,7 @@
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 16px;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 400px);
   overflow-y: auto;
 }
 
