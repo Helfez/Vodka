@@ -67,10 +67,6 @@ const Whiteboard = ({
   // State for sticker button visibility and position
   const [stickerButtonPosition, setStickerButtonPosition] = useState<FloatingButtonPosition | null>(null);
 
-  // State for AI generation panel
-  const [isAIGenerationOpen, setIsAIGenerationOpen] = useState(false);
-  const [canvasSnapshot, setCanvasSnapshot] = useState<string>('');
-
   // State for log viewer
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
 
@@ -783,9 +779,9 @@ Analyze the user's whiteboard sketch, which may include images, annotations, or 
 
       {/* AI生成面板 */}
       <AIGenerationPanel
-        isOpen={isAIGenerationOpen}
-        onClose={() => setIsAIGenerationOpen(false)}
-        canvasSnapshot={canvasSnapshot}
+        isOpen={false}
+        onClose={() => {}}
+        canvasSnapshot={''}
         onImageGenerated={handleAIImageGenerated}
       />
 
