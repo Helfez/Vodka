@@ -81,7 +81,7 @@ const Whiteboard = ({
 
   // State for AI prompt sidebar and related AI logic
   const [isPromptSidebarOpen, setIsPromptSidebarOpen] = useState(false);
-  const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
+  const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT(''));
   const [generatedPrompt, setGeneratedPrompt] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
