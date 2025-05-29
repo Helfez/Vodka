@@ -158,8 +158,10 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       console.log('  - 生成图片数量:', generationResult.images.length);
       console.log('  - 总耗时:', Math.round(generateEndTime - analysisStartTime), 'ms');
 
-      // 第三步：保存生成的图片到存储服务
+      // 第三步：保存生成的图片到存储服务并替换URL
       console.log('[AIGenerationPanel handleOneClickGenerate] 💾 保存生成的图片...');
+      const processedImages = [];
+      
       try {
         for (const image of generationResult.images) {
           // 上传到Cloudinary
@@ -179,20 +181,28 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
             const uploadResult = await uploadResponse.json();
             if (uploadResult.success) {
               console.log('[AIGenerationPanel handleOneClickGenerate] ✅ 图片已上传到Cloudinary:', uploadResult.cloudinaryUrl);
+              // 使用Cloudinary URL替换原始URL
+              processedImages.push({
+                ...image,
+                url: uploadResult.cloudinaryUrl
+              });
             } else {
-              console.warn('[AIGenerationPanel handleOneClickGenerate] ⚠️ Cloudinary上传失败:', uploadResult.error);
+              console.warn('[AIGenerationPanel handleOneClickGenerate] ⚠️ Cloudinary上传失败，使用原始URL:', uploadResult.error);
+              processedImages.push(image);
             }
           } else {
-            console.warn('[AIGenerationPanel handleOneClickGenerate] ⚠️ 上传请求失败:', uploadResponse.status);
+            console.warn('[AIGenerationPanel handleOneClickGenerate] ⚠️ 上传请求失败，使用原始URL:', uploadResponse.status);
+            processedImages.push(image);
           }
         }
       } catch (saveError) {
-        console.warn('[AIGenerationPanel handleOneClickGenerate] ⚠️ 图片保存失败:', saveError);
-        // 保存失败不影响主流程
+        console.warn('[AIGenerationPanel handleOneClickGenerate] ⚠️ 图片保存失败，使用原始URL:', saveError);
+        // 保存失败时使用原始图片
+        processedImages.push(...generationResult.images);
       }
 
-      // 第四步：显示结果
-      setGeneratedImages(generationResult.images);
+      // 第四步：显示结果（使用处理后的图片URL）
+      setGeneratedImages(processedImages);
       
       console.log('[AIGenerationPanel handleOneClickGenerate] ✅ 一键生成完成');
       console.log('[AIGenerationPanel handleOneClickGenerate] === 一键生成流程完成 ===');
