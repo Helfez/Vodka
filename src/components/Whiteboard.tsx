@@ -145,32 +145,6 @@ Analyze the user's whiteboard sketch, which may include images, annotations, or 
     });
   }, [setHistory, fabricCanvasRef, brushSize, brushColor, initialIsDrawingMode]); // Removed 'history' from deps
 
-  // 处理AI分析
-  const handleAIAnalysis = useCallback(async (canvasSnapshot: string) => {
-    console.log('[Whiteboard handleAIAnalysis] === AI分析流程开始 ===');
-    
-    try {
-      // 导入AI服务
-      const { AihubmixVisionService } = await import('./ImageSticker/services/aihubmix-vision.service');
-      const visionService = AihubmixVisionService.getInstance();
-      
-      console.log('[Whiteboard handleAIAnalysis] 🤖 开始AI分析...');
-      setAiPrompt('正在分析中...');
-      setIsPromptSidebarOpen(true);
-      
-      const analysisResult = await visionService.analyzeImage(canvasSnapshot, systemPrompt);
-      
-      console.log('[Whiteboard handleAIAnalysis] ✅ AI分析完成');
-      console.log('  - 返回prompt长度:', analysisResult.analysis.length, '字符');
-      
-      setAiPrompt(analysisResult.analysis);
-      
-    } catch (error) {
-      console.error('[Whiteboard handleAIAnalysis] ❌ AI分析失败:', error);
-      setAiPrompt('AI分析失败: ' + (error instanceof Error ? error.message : String(error)));
-    }
-  }, [systemPrompt]);
-
   // 处理AI生成面板打开
   const handleOpenAIGeneration = useCallback(() => {
     console.log('[Whiteboard handleOpenAIGeneration] === AI生成流程开始 ===');
