@@ -632,12 +632,12 @@ const Whiteboard = ({
       
       {/* AI生成按钮 */}
       <div className="ai-generation-trigger">
-        <button 
-          className="ai-generation-button"
+        <button
+          className="ai-generation-btn"
           onClick={handleOpenAIGeneration}
-          title="AI图片生成 (Ctrl+G)"
+          title="使用AI生成图片 (Ctrl+G)"
         >
-          🎨 AI生成
+          ⚡ 一键生成
         </button>
         <button 
           className="log-viewer-button"

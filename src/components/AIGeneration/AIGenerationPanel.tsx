@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { AihubmixVisionService } from '../ImageSticker/services/aihubmix-vision.service';
 import { AihubmixDalleService } from '../ImageSticker/services/aihubmix-dalle.service';
 import { PromptTemplateManager, PromptTemplate } from '../ImageSticker/services/prompt-templates';
@@ -39,17 +39,19 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
   const PROFESSIONAL_SYSTEM_PROMPT = `你是一位专业的潮玩设计提示词生成助手，专注于为潮玩生成高质量的图像生成prompt。你永远不会离开模玩/潮玩设计的范畴。
 
 你的任务是：根据用户提供的草图（图像）和简要描述（如风格、动作、主题），输出一段适合图像生成模型（如DALL·E 3 或 SDXL）的高质量英文prompt，用于生成最终的渲染图。
-你的次要任务是：如果用户的提供的草图内容过于抽象，无法分析出生成对象、风格、主题，则你将根据用户提供的草图内容，生成一个适合的潮玩设计提示词。
+你的次要任务是：如果用户的提供的草图内容过于抽象，无法分析出生成对象、风格、主题，则你将根据用户提供的草图内容，生成一个适合的潮玩设计提示词，且能至少有一个元素与草图相关
 
 所有的生成prompt必须遵守以下限制条件：
 1. 必须描述一个适合彩色一体式3D打印的潮玩角色，最终尺寸约为8cm高；
+2. 最终尺寸约为8cm高左右，设计时必须考虑3D打印的尺寸限制，保证能通过3D打印技术制作；
 2. 不得生成环境、背景、风景或抽象构图，主体必须是角色或生物；
 3. 角色要有明确风格；
 4. prompt必须清晰、结构化，描述角色姿势、颜色、主要造型语言；
-5. 不得输出模糊或风格发散的内容，确保实物模型可用3D彩色打印技术制作，符合真实世界的物理规律。
+5. 不得输出模糊或风格发散的内容。
+6. 最终设计稿必须是透明背景的PNG格式。
 
 输出格式为一段英文提示词，例如：
-“a cute collectible vinyl figure of a whale-themed robot, with big expressive eyes, smooth mechanical armor plating, standing 8cm tall, designed for one-piece full color 3D print, white and ocean blue color scheme, minimalistic background”
+"a cute collectible vinyl figure of a whale-themed robot, with big expressive eyes, smooth mechanical armor plating, standing 8cm tall, designed for one-piece full color 3D print, white and ocean blue color scheme, minimalistic background"
 
 你可以补充细节，但只能是帮助3D打印实现可行性的内容。`;
 
@@ -195,22 +197,6 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
     console.log('[AIGenerationPanel handleUseImage] === 图片使用流程完成 ===');
   }, [onImageGenerated, onClose]);
 
-  // 重置状态
-  const handleReset = useCallback(() => {
-    console.log('[AIGenerationPanel handleReset] === 重置流程开始 ===');
-    console.log('[AIGenerationPanel handleReset] 🔄 清理所有状态...');
-    
-    setCurrentStep('analyze');
-    setSelectedTemplate(null);
-    setAnalysisResult('');
-    setEditablePrompt('');
-    setGeneratedImages([]);
-    setError('');
-    
-    console.log('[AIGenerationPanel handleReset] ✅ 状态重置完成');
-    console.log('[AIGenerationPanel handleReset] === 重置流程完成 ===');
-  }, []);
-
   // 一键生成功能
   const handleOneClickGenerate = useCallback(async () => {
     console.log('[AIGenerationPanel handleOneClickGenerate] === 一键生成流程开始 ===');
@@ -291,6 +277,34 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       console.log('[AIGenerationPanel handleOneClickGenerate] 🔄 清理加载状态');
     }
   }, [canvasSnapshot, visionService, dalleService, PROFESSIONAL_SYSTEM_PROMPT]);
+
+  // 重置状态
+  const handleReset = useCallback(() => {
+    console.log('[AIGenerationPanel handleReset] === 重置流程开始 ===');
+    console.log('[AIGenerationPanel handleReset] 🔄 清理所有状态...');
+    
+    setCurrentStep('analyze');
+    setSelectedTemplate(null);
+    setAnalysisResult('');
+    setEditablePrompt('');
+    setGeneratedImages([]);
+    setError('');
+    
+    console.log('[AIGenerationPanel handleReset] ✅ 状态重置完成，将重新生成');
+    console.log('[AIGenerationPanel handleReset] === 重置流程完成 ===');
+    
+    // 重置后自动重新生成
+    setTimeout(() => {
+      handleOneClickGenerate();
+    }, 100);
+  }, [handleOneClickGenerate]);
+
+  // 面板打开时自动执行一键生成
+  useEffect(() => {
+    if (isOpen && canvasSnapshot && !isLoading && generatedImages.length === 0) {
+      handleOneClickGenerate();
+    }
+  }, [isOpen, canvasSnapshot, isLoading, generatedImages.length, handleOneClickGenerate]);
 
   if (!isOpen) return null;
 
