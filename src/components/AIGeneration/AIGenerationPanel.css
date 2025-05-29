@@ -570,17 +570,179 @@
 /* 响应式设计更新 */
 @media (max-width: 768px) {
   .reference-grid {
-    gap: 8px;
+    grid-template-columns: 1fr;
   }
   
   .reference-item {
-    width: 60px;
-    height: 60px;
+    width: 120px;
+    height: 120px;
   }
   
   .reference-index {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
     font-size: 10px;
+  }
+}
+
+/* System Prompt 编辑区域样式 */
+.system-prompt-section {
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8fafc;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.generate-button {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.generate-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.generate-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.system-prompt-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.5;
+  background: white;
+  transition: border-color 0.2s ease;
+}
+
+.system-prompt-textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.reference-images h5 {
+  margin: 16px 0 8px 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.welcome-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+.welcome-message h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.3rem;
+  color: #374151;
+}
+
+.welcome-message p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .system-prompt-section {
+    padding: 16px;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .generate-button {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .system-prompt-textarea {
+    font-size: 16px; /* 防止iOS缩放 */
+  }
+}
+
+/* AI分析返回的生图prompt显示区域 */
+.analysis-prompt-section {
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fff7ed;
+  border-left: 4px solid #f97316;
+}
+
+.analysis-prompt-section h4 {
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #ea580c;
+}
+
+.analysis-prompt-content {
+  background: white;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 16px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.analysis-prompt-content pre {
+  margin: 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #1f2937;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* 响应式设计更新 */
+@media (max-width: 768px) {
+  .analysis-prompt-section {
+    padding: 16px;
+  }
+  
+  .analysis-prompt-content {
+    padding: 12px;
+    max-height: 150px;
+  }
+  
+  .analysis-prompt-content pre {
+    font-size: 12px;
   }
 } 

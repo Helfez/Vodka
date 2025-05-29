@@ -19,6 +19,7 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
   const [generatedImages, setGeneratedImages] = useState<Array<{ url: string; revised_prompt?: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [analysisPrompt, setAnalysisPrompt] = useState<string>(''); // 存储AI分析返回的生图prompt
   const [systemPrompt, setSystemPrompt] = useState<string>(`You are a professional prompt-generation assistant specialized in collectible vinyl toy (潮玩) design. You are strictly limited to tasks within the domain of toy and figure design, and must never deviate from that scope.
 
 ## Primary Task:
@@ -143,6 +144,7 @@ If the user-provided sketch is too abstract or ambiguous to determine clear subj
       console.log('  - 优化prompt预览:', analysisResult.analysis.substring(0, 100) + '...');
 
       const optimizedPrompt = analysisResult.analysis;
+      setAnalysisPrompt(optimizedPrompt); // 保存AI分析返回的prompt
 
       // 第二步：直接使用优化后的prompt生成图片
       console.log('[AIGenerationPanel handleOneClickGenerate] 🎨 使用优化prompt生成图片...');
@@ -222,6 +224,7 @@ If the user-provided sketch is too abstract or ambiguous to determine clear subj
     
     setGeneratedImages([]);
     setError('');
+    setAnalysisPrompt(''); // 清空分析prompt
     
     console.log('[AIGenerationPanel handleReset] ✅ 状态重置完成，将重新生成');
     console.log('[AIGenerationPanel handleReset] === 重置流程完成 ===');
@@ -232,13 +235,6 @@ If the user-provided sketch is too abstract or ambiguous to determine clear subj
     }, 100);
   }, [handleOneClickGenerate]);
 
-  // 面板打开时自动执行一键生成
-  useEffect(() => {
-    if (isOpen && canvasSnapshot && !isLoading && generatedImages.length === 0) {
-      handleOneClickGenerate();
-    }
-  }, [isOpen, canvasSnapshot, isLoading, generatedImages.length, handleOneClickGenerate]);
-
   if (!isOpen) return null;
 
   return (
@@ -248,6 +244,49 @@ If the user-provided sketch is too abstract or ambiguous to determine clear subj
           <h2>一键生成</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
+
+        {/* System Prompt 编辑区域 - 始终显示 */}
+        <div className="system-prompt-section">
+          <div className="section-header">
+            <h4>🎯 System Prompt 编辑</h4>
+            <button 
+              className="generate-button"
+              onClick={handleOneClickGenerate}
+              disabled={isLoading}
+            >
+              {isLoading ? '生成中...' : '🚀 生成图片'}
+            </button>
+          </div>
+          <textarea
+            value={systemPrompt}
+            onChange={(e) => setSystemPrompt(e.target.value)}
+            placeholder="输入System Prompt..."
+            rows={6}
+            className="system-prompt-textarea"
+          />
+          
+          {/* 显示参考图片 */}
+          <div className="reference-images">
+            <h5>📸 参考图片：</h5>
+            <div className="reference-grid">
+              <div className="reference-item">
+                <img src={REFERENCE_IMAGE_URL} alt="参考图片" />
+                <span className="reference-index">1</span>
+              </div>
+            </div>
+            <p className="reference-note">AI将参考这张图片的风格和元素</p>
+          </div>
+        </div>
+
+        {/* 显示AI分析返回的生图prompt */}
+        {analysisPrompt && (
+          <div className="analysis-prompt-section">
+            <h4>🤖 AI分析返回的生图Prompt</h4>
+            <div className="analysis-prompt-content">
+              <pre>{analysisPrompt}</pre>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="error-message">
@@ -298,40 +337,9 @@ If the user-provided sketch is too abstract or ambiguous to determine clear subj
         {/* 初始状态 */}
         {!isLoading && generatedImages.length === 0 && !error && (
           <div className="initial-content">
-            <div className="loading-spinner"></div>
-            <h3>准备生成...</h3>
-            <p>正在分析画板内容</p>
-            
-            {/* System Prompt 测试输入框 */}
-            <div className="system-prompt-editor">
-              <h4>System Prompt (测试用):</h4>
-              <textarea
-                value={systemPrompt}
-                onChange={(e) => setSystemPrompt(e.target.value)}
-                placeholder="输入System Prompt..."
-                rows={8}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  fontFamily: 'monospace',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
-            
-            {/* 显示参考图片 */}
-            <div className="reference-images">
-              <h4>参考图片：</h4>
-              <div className="reference-grid">
-                <div className="reference-item">
-                  <img src={REFERENCE_IMAGE_URL} alt="参考图片" />
-                  <span className="reference-index">1</span>
-                </div>
-              </div>
-              <p className="reference-note">AI将参考这张图片的风格和元素</p>
+            <div className="welcome-message">
+              <h3>🎨 AI图片生成器</h3>
+              <p>编辑上方的System Prompt，然后点击"生成图片"按钮开始</p>
             </div>
           </div>
         )}

@@ -74,6 +74,10 @@ const Whiteboard = ({
   // State for log viewer
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
 
+  // State for AI prompt sidebar
+  const [aiPrompt, setAiPrompt] = useState<string>('');
+  const [isPromptSidebarOpen, setIsPromptSidebarOpen] = useState(false);
+
   // --- Callbacks --- 
 
   // Callback to record the current canvas state for undo history
@@ -128,6 +132,47 @@ const Whiteboard = ({
     });
   }, [setHistory, fabricCanvasRef, brushSize, brushColor, initialIsDrawingMode]); // Removed 'history' from deps
 
+  // 处理AI分析
+  const handleAIAnalysis = useCallback(async (canvasSnapshot: string) => {
+    console.log('[Whiteboard handleAIAnalysis] === AI分析流程开始 ===');
+    
+    try {
+      // 导入AI服务
+      const { AihubmixVisionService } = await import('./ImageSticker/services/aihubmix-vision.service');
+      const visionService = AihubmixVisionService.getInstance();
+      
+      // 系统提示词
+      const systemPrompt = `You are a professional prompt-generation assistant specialized in collectible vinyl toy (潮玩) design. You are strictly limited to tasks within the domain of toy and figure design, and must never deviate from that scope.
+
+## Primary Task:
+Analyze the user's whiteboard sketch, which may include images, annotations, or doodles, and generate a high-quality English prompt suitable for image generation models (such as DALL·E 3). This prompt will be used to produce a rendering of the collectible figure.
+
+## Strict Design Constraints:
+1. The design must describe a collectible character or creature suitable for full-color one-piece 3D printing at approximately 8cm in height.
+2. All design choices must consider real-world 3D printing feasibility at 8cm scale — no thin, fragile, or floating structures.
+3. The prompt must **not include any environment, scenery, background**, or abstract artistic elements — only the character or creature is allowed.
+4. The figure must have a distinct and recognizable **style or theme** (e.g., whale-inspired, bio-mechanical, cute sci-fi).
+5. The prompt must be **clear and structured**, describing the pose, silhouette, color scheme, and visual language of the design.
+6. The prompt must **not** contain vague or overly broad stylistic descriptions.
+7. The expected output is an image with a **transparent background**, suitable for rendering and modeling use.`;
+
+      console.log('[Whiteboard handleAIAnalysis] 🤖 开始AI分析...');
+      setAiPrompt('正在分析中...');
+      setIsPromptSidebarOpen(true);
+      
+      const analysisResult = await visionService.analyzeImage(canvasSnapshot, systemPrompt);
+      
+      console.log('[Whiteboard handleAIAnalysis] ✅ AI分析完成');
+      console.log('  - 返回prompt长度:', analysisResult.analysis.length, '字符');
+      
+      setAiPrompt(analysisResult.analysis);
+      
+    } catch (error) {
+      console.error('[Whiteboard handleAIAnalysis] ❌ AI分析失败:', error);
+      setAiPrompt('AI分析失败: ' + (error instanceof Error ? error.message : String(error)));
+    }
+  }, []);
+
   // 处理AI生成面板打开
   const handleOpenAIGeneration = useCallback(() => {
     console.log('[Whiteboard handleOpenAIGeneration] === AI生成流程开始 ===');
@@ -180,17 +225,16 @@ const Whiteboard = ({
         console.error('[Whiteboard handleOpenAIGeneration] ❌ PNG下载失败:', downloadError);
       }
       
-      setCanvasSnapshot(dataURL);
-      setIsAIGenerationOpen(true);
-      console.log('[Whiteboard handleOpenAIGeneration] 🎨 AI生成面板已打开');
-      console.log('[Whiteboard handleOpenAIGeneration] === AI生成流程准备完成 ===');
+      // 直接调用AI分析并显示在侧边栏
+      handleAIAnalysis(dataURL);
+      
     } catch (error) {
       console.error('[Whiteboard handleOpenAIGeneration] ❌ 快照生成失败:', error);
       console.error('  - 错误类型:', error instanceof Error ? error.constructor.name : typeof error);
       console.error('  - 错误消息:', error instanceof Error ? error.message : String(error));
       console.error('  - 错误堆栈:', error instanceof Error ? error.stack : 'N/A');
     }
-  }, []);
+  }, [handleAIAnalysis]);
 
   // 处理AI生成的图片
   const handleAIImageGenerated = useCallback((imageUrl: string) => {
@@ -635,9 +679,9 @@ const Whiteboard = ({
         <button
           className="ai-generation-btn"
           onClick={handleOpenAIGeneration}
-          title="使用AI生成图片 (Ctrl+G)"
+          title="分析画板内容生成Prompt"
         >
-          ⚡ 一键生成
+          🤖 分析画板
         </button>
         <button 
           className="log-viewer-button"
@@ -646,38 +690,72 @@ const Whiteboard = ({
         >
           📊 日志
         </button>
+        {isPromptSidebarOpen && (
+          <button 
+            className="close-sidebar-button"
+            onClick={() => setIsPromptSidebarOpen(false)}
+            title="关闭Prompt侧边栏"
+          >
+            ✖️ 关闭
+          </button>
+        )}
       </div>
 
-      <div 
-        className="whiteboard-container"
-        onContextMenu={handleContextMenu}
-      >
-        <UndoButton 
-          canUndo={history.length > 1}
-          onUndo={handleUndo}
-        />
-        <div className="canvas-wrapper">
-          <canvas ref={canvasElRef} />
-        </div>
-        {menuPosition && (
-          <ImageUploader onImageProcessed={handleImageProcessed}>
-            <FloatingMenu
-              position={menuPosition}
-              onUploadClick={() => {}}
-              onClose={() => {
-                setMenuPosition(null);
-                setClickPosition(null);
-              }}
-            />
-          </ImageUploader>
-        )}
-        {stickerButtonPosition && (
-          <FloatingButton
-            position={stickerButtonPosition}
-            onConvert={handleStickerConvert}
-            onClose={() => setStickerButtonPosition(null)}
-            targetImage={stickerButtonPosition.target}
+      <div className="whiteboard-main-content">
+        <div 
+          className="whiteboard-container"
+          onContextMenu={handleContextMenu}
+        >
+          <UndoButton 
+            canUndo={history.length > 1}
+            onUndo={handleUndo}
           />
+          <div className="canvas-wrapper">
+            <canvas ref={canvasElRef} />
+          </div>
+          {menuPosition && (
+            <ImageUploader onImageProcessed={handleImageProcessed}>
+              <FloatingMenu
+                position={menuPosition}
+                onUploadClick={() => {}}
+                onClose={() => {
+                  setMenuPosition(null);
+                  setClickPosition(null);
+                }}
+              />
+            </ImageUploader>
+          )}
+          {stickerButtonPosition && (
+            <FloatingButton
+              position={stickerButtonPosition}
+              onConvert={handleStickerConvert}
+              onClose={() => setStickerButtonPosition(null)}
+              targetImage={stickerButtonPosition.target}
+            />
+          )}
+        </div>
+
+        {/* AI Prompt 侧边栏 */}
+        {isPromptSidebarOpen && (
+          <div className="ai-prompt-sidebar">
+            <div className="sidebar-header">
+              <h3>🤖 AI分析结果</h3>
+              <button 
+                className="sidebar-close-btn"
+                onClick={() => setIsPromptSidebarOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="sidebar-content">
+              <div className="prompt-display">
+                <h4>生图Prompt:</h4>
+                <div className="prompt-text">
+                  <pre>{aiPrompt}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
