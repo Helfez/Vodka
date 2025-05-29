@@ -67,6 +67,10 @@ const Whiteboard = ({
   // State for sticker button visibility and position
   const [stickerButtonPosition, setStickerButtonPosition] = useState<FloatingButtonPosition | null>(null);
 
+  // State for AI generation panel
+  const [isAIGenerationOpen, setIsAIGenerationOpen] = useState(false);
+  const [canvasSnapshot, setCanvasSnapshot] = useState<string>('');
+
   // State for log viewer
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
 
@@ -219,8 +223,11 @@ Analyze the user's whiteboard sketch, which may include images, annotations, or 
         console.error('[Whiteboard handleOpenAIGeneration] ❌ PNG下载失败:', downloadError);
       }
       
-      // 直接调用AI分析并显示在侧边栏
-      handleAIAnalysis(dataURL);
+      // 设置快照并打开AI生成面板
+      setCanvasSnapshot(dataURL);
+      setIsAIGenerationOpen(true);
+      console.log('[Whiteboard handleOpenAIGeneration] 🎨 AI生成面板已打开');
+      console.log('[Whiteboard handleOpenAIGeneration] === AI生成流程准备完成 ===');
       
     } catch (error) {
       console.error('[Whiteboard handleOpenAIGeneration] ❌ 快照生成失败:', error);
@@ -228,7 +235,7 @@ Analyze the user's whiteboard sketch, which may include images, annotations, or 
       console.error('  - 错误消息:', error instanceof Error ? error.message : String(error));
       console.error('  - 错误堆栈:', error instanceof Error ? error.stack : 'N/A');
     }
-  }, [handleAIAnalysis]);
+  }, []);
 
   // 处理AI生成的图片
   const handleAIImageGenerated = useCallback((imageUrl: string) => {
@@ -672,6 +679,13 @@ Analyze the user's whiteboard sketch, which may include images, annotations, or 
       <div className="ai-generation-trigger">
         <button
           className="ai-generation-btn"
+          onClick={handleOpenAIGeneration}
+          title="AI生成图片"
+        >
+          🎨 生图
+        </button>
+        <button
+          className="ai-generation-btn"
           onClick={() => setIsPromptSidebarOpen(true)}
           title="打开AI分析工具"
         >
@@ -779,9 +793,9 @@ Analyze the user's whiteboard sketch, which may include images, annotations, or 
 
       {/* AI生成面板 */}
       <AIGenerationPanel
-        isOpen={false}
-        onClose={() => {}}
-        canvasSnapshot={''}
+        isOpen={isAIGenerationOpen}
+        onClose={() => setIsAIGenerationOpen(false)}
+        canvasSnapshot={canvasSnapshot}
         onImageGenerated={handleAIImageGenerated}
       />
 
