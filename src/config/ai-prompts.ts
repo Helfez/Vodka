@@ -21,10 +21,11 @@ export const convertImageUrlToBase64 = async (imageUrl: string): Promise<string>
 // 生成带有参考图片的系统提示
 export const getSystemPromptWithImage = async (imageUrl: string): Promise<string> => {
   const referenceImageBase64 = await convertImageUrlToBase64(imageUrl);
-  return getSystemPrompt(referenceImageBase64);
+  return DEFAULT_SYSTEM_PROMPT(referenceImageBase64);
 };
 
-export const getSystemPrompt = (referenceImageBase64: string) => `✅ Professional Designer System Prompt (ENGLISH VERSION for API use)
+// 生成包含参考图片的系统提示词
+export const DEFAULT_SYSTEM_PROMPT = (referenceImageBase64: string) => `✅ Professional Designer System Prompt (ENGLISH VERSION for API use)
 
 You are a professional prompt generation assistant specializing in designer toys and art figures. You must never leave the domain of collectible figures, toy design, or 3D print-ready character concepts.
 
