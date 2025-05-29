@@ -35,6 +35,24 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
   const visionService = AihubmixVisionService.getInstance();
   const dalleService = AihubmixDalleService.getInstance();
 
+  // 预设的专业System Prompt
+  const PROFESSIONAL_SYSTEM_PROMPT = `你是一位专业的潮玩设计提示词生成助手，专注于为潮玩生成高质量的图像生成prompt。你永远不会离开模玩/潮玩设计的范畴。
+
+你的任务是：根据用户提供的草图（图像）和简要描述（如风格、动作、主题），输出一段适合图像生成模型（如DALL·E 3 或 SDXL）的高质量英文prompt，用于生成最终的渲染图。
+你的次要任务是：如果用户的提供的草图内容过于抽象，无法分析出生成对象、风格、主题，则你将根据用户提供的草图内容，生成一个适合的潮玩设计提示词。
+
+所有的生成prompt必须遵守以下限制条件：
+1. 必须描述一个适合彩色一体式3D打印的潮玩角色，最终尺寸约为8cm高；
+2. 不得生成环境、背景、风景或抽象构图，主体必须是角色或生物；
+3. 角色要有明确风格；
+4. prompt必须清晰、结构化，描述角色姿势、颜色、主要造型语言；
+5. 不得输出模糊或风格发散的内容，确保实物模型可用3D彩色打印技术制作，符合真实世界的物理规律。
+
+输出格式为一段英文提示词，例如：
+“a cute collectible vinyl figure of a whale-themed robot, with big expressive eyes, smooth mechanical armor plating, standing 8cm tall, designed for one-piece full color 3D print, white and ocean blue color scheme, minimalistic background”
+
+你可以补充细节，但只能是帮助3D打印实现可行性的内容。`;
+
   const steps: GenerationStep[] = [
     { id: 'analyze', name: '分析画板', status: currentStep === 'analyze' ? 'loading' : currentStep > 'analyze' ? 'completed' : 'pending' },
     { id: 'generate', name: '生成图片', status: currentStep === 'generate' ? 'loading' : currentStep > 'generate' ? 'completed' : 'pending' },
@@ -193,6 +211,87 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
     console.log('[AIGenerationPanel handleReset] === 重置流程完成 ===');
   }, []);
 
+  // 一键生成功能
+  const handleOneClickGenerate = useCallback(async () => {
+    console.log('[AIGenerationPanel handleOneClickGenerate] === 一键生成流程开始 ===');
+    
+    if (!canvasSnapshot) {
+      console.error('[AIGenerationPanel handleOneClickGenerate] ❌ 画板快照不可用');
+      setError('请先获取画板快照');
+      return;
+    }
+
+    console.log('[AIGenerationPanel handleOneClickGenerate] 📋 一键生成配置:');
+    console.log('  - 快照大小:', Math.round(canvasSnapshot.length / 1024), 'KB');
+    console.log('  - 使用专业System Prompt');
+
+    setIsLoading(true);
+    setError('');
+    setCurrentStep('analyze');
+
+    try {
+      // 第一步：使用专业System Prompt分析图像
+      console.log('[AIGenerationPanel handleOneClickGenerate] 📸 使用专业System Prompt分析画板...');
+      const analysisStartTime = performance.now();
+      
+      const analysisResult = await visionService.analyzeImage(
+        canvasSnapshot,
+        PROFESSIONAL_SYSTEM_PROMPT,
+        "请分析这个画板内容并生成适合DALL-E的专业prompt"
+      );
+
+      const analysisEndTime = performance.now();
+      const analysisTime = Math.round(analysisEndTime - analysisStartTime);
+      
+      console.log('[AIGenerationPanel handleOneClickGenerate] ✅ 分析完成:');
+      console.log('  - 分析耗时:', analysisTime, 'ms');
+      console.log('  - 优化prompt长度:', analysisResult.analysis.length, '字符');
+      console.log('  - 优化prompt预览:', analysisResult.analysis.substring(0, 100) + '...');
+
+      const optimizedPrompt = analysisResult.analysis;
+      setAnalysisResult(optimizedPrompt);
+      setEditablePrompt(optimizedPrompt);
+
+      // 第二步：直接使用优化后的prompt生成图片
+      setCurrentStep('generate');
+      console.log('[AIGenerationPanel handleOneClickGenerate] 🎨 使用优化prompt生成图片...');
+      
+      const generateStartTime = performance.now();
+      
+      const generationResult = await dalleService.generateImage(optimizedPrompt, {
+        n: 1,
+        size: "1024x1024",
+        quality: "standard",
+        style: "vivid"
+      });
+
+      const generateEndTime = performance.now();
+      const generateTime = Math.round(generateEndTime - generateStartTime);
+      
+      console.log('[AIGenerationPanel handleOneClickGenerate] ✅ 图片生成完成:');
+      console.log('  - 生成耗时:', generateTime, 'ms');
+      console.log('  - 生成图片数量:', generationResult.images.length);
+      console.log('  - 总耗时:', Math.round(generateEndTime - analysisStartTime), 'ms');
+
+      // 第三步：显示结果
+      setCurrentStep('complete');
+      setGeneratedImages(generationResult.images);
+      
+      console.log('[AIGenerationPanel handleOneClickGenerate] ✅ 一键生成完成');
+      console.log('[AIGenerationPanel handleOneClickGenerate] === 一键生成流程完成 ===');
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '一键生成失败';
+      console.error('[AIGenerationPanel handleOneClickGenerate] ❌ 一键生成失败:', error);
+      console.error('  - 错误类型:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('  - 错误消息:', errorMessage);
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+      console.log('[AIGenerationPanel handleOneClickGenerate] 🔄 清理加载状态');
+    }
+  }, [canvasSnapshot, visionService, dalleService, PROFESSIONAL_SYSTEM_PROMPT]);
+
   if (!isOpen) return null;
 
   return (
@@ -200,7 +299,17 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       <div className="ai-generation-panel">
         <div className="panel-header">
           <h2>AI 图片生成</h2>
-          <button className="close-button" onClick={onClose}>×</button>
+          <div className="header-buttons">
+            <button 
+              className="one-click-button"
+              onClick={handleOneClickGenerate}
+              disabled={isLoading || !canvasSnapshot}
+              title="使用专业AI直接生成图片"
+            >
+              ⚡ 一键生成
+            </button>
+            <button className="close-button" onClick={onClose}>×</button>
+          </div>
         </div>
 
         {/* 进度指示器 */}
