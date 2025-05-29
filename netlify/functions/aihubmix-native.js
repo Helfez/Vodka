@@ -137,52 +137,64 @@ export default async (request, context) => {
         
         console.log(`[aihubmix-native-trigger] 🚀 调用后台函数: ${backgroundFunctionURL}, 任务: ${taskId}`);
 
-        // 使用全局fetch而不是node-fetch
-        const fetchPromise = fetch(backgroundFunctionURL, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'User-Agent': 'Netlify-Function-Internal'
-            },
-            body: JSON.stringify({ taskId })
-        });
+        // 同步调用后台函数，确保调用成功
+        try {
+            const backgroundResponse = await fetch(backgroundFunctionURL, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Netlify-Function-Internal'
+                },
+                body: JSON.stringify({ taskId }),
+                timeout: 5000 // 5秒超时
+            });
 
-        // 不等待结果，但添加更详细的错误处理
-        fetchPromise.then(async (res) => {
-            console.log(`[aihubmix-native-trigger] 📡 后台函数响应状态: ${res.status}, 任务: ${taskId}`);
-            if (!res.ok) {
-                const errorText = await res.text().catch(() => 'Unable to read error response');
-                console.error(`[aihubmix-native-trigger] ❌ 后台函数调用失败，任务: ${taskId}, 状态: ${res.status}, 响应: ${errorText}`);
+            console.log(`[aihubmix-native-trigger] 📡 后台函数响应状态: ${backgroundResponse.status}, 任务: ${taskId}`);
+            
+            if (!backgroundResponse.ok) {
+                const errorText = await backgroundResponse.text().catch(() => 'Unable to read error response');
+                console.error(`[aihubmix-native-trigger] ❌ 后台函数调用失败，任务: ${taskId}, 状态: ${backgroundResponse.status}, 响应: ${errorText}`);
                 
                 // 更新任务状态为失败
-                try {
-                    await store.setJSON(taskId, { 
-                        ...taskData, 
-                        status: 'trigger_failed', 
-                        error: `Background invocation failed with status ${res.status}: ${errorText}`,
-                        failedAt: new Date().toISOString()
-                    });
-                } catch (updateError) {
-                    console.error(`[aihubmix-native-trigger] ❌ 更新任务状态失败:`, updateError);
-                }
-            } else {
-                console.log(`[aihubmix-native-trigger] ✅ 成功调用后台函数，任务: ${taskId}`);
-            }
-        }).catch(async (err) => {
-            console.error(`[aihubmix-native-trigger] ❌ 网络错误，任务: ${taskId}:`, err);
-            
-            // 更新任务状态为失败
-            try {
                 await store.setJSON(taskId, { 
                     ...taskData, 
                     status: 'trigger_failed', 
-                    error: `Background invocation network error: ${err.message}`,
+                    error: `Background invocation failed with status ${backgroundResponse.status}: ${errorText}`,
                     failedAt: new Date().toISOString()
                 });
-            } catch (updateError) {
-                console.error(`[aihubmix-native-trigger] ❌ 网络错误后更新状态失败:`, updateError);
+                
+                return new Response(JSON.stringify({ 
+                    success: false,
+                    error: '后台处理启动失败',
+                    details: errorText
+                }), {
+                    status: 500,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            } else {
+                console.log(`[aihubmix-native-trigger] ✅ 成功调用后台函数，任务: ${taskId}`);
             }
-        });
+            
+        } catch (fetchError) {
+            console.error(`[aihubmix-native-trigger] ❌ 网络错误，任务: ${taskId}:`, fetchError);
+            
+            // 更新任务状态为失败
+            await store.setJSON(taskId, { 
+                ...taskData, 
+                status: 'trigger_failed', 
+                error: `Background invocation network error: ${fetchError.message}`,
+                failedAt: new Date().toISOString()
+            });
+            
+            return new Response(JSON.stringify({ 
+                success: false,
+                error: '后台处理网络错误',
+                details: fetchError.message
+            }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
 
         return new Response(JSON.stringify({ 
             success: true, 
