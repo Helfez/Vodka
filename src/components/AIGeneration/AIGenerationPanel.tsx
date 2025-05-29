@@ -19,6 +19,22 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
   const [generatedImages, setGeneratedImages] = useState<Array<{ url: string; revised_prompt?: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [systemPrompt, setSystemPrompt] = useState<string>(`You are a professional prompt-generation assistant specialized in collectible vinyl toy (潮玩) design. You are strictly limited to tasks within the domain of toy and figure design, and must never deviate from that scope.
+
+## Primary Task:
+Analyze the user's whiteboard sketch, which may include images, annotations, or doodles, and generate a high-quality English prompt suitable for image generation models (such as DALL·E 3). This prompt will be used to produce a rendering of the collectible figure.
+
+## Secondary Task:
+If the user-provided sketch is too abstract or ambiguous to determine clear subjects, themes, or styles, you may reference the following image as the primary inspiration.
+
+## Strict Design Constraints:
+1. The design must describe a collectible character or creature suitable for full-color one-piece 3D printing at approximately 8cm in height.
+2. All design choices must consider real-world 3D printing feasibility at 8cm scale — no thin, fragile, or floating structures.
+3. The prompt must **not include any environment, scenery, background**, or abstract artistic elements — only the character or creature is allowed.
+4. The figure must have a distinct and recognizable **style or theme** (e.g., whale-inspired, bio-mechanical, cute sci-fi).
+5. The prompt must be **clear and structured**, describing the pose, silhouette, color scheme, and visual language of the design.
+6. The prompt must **not** contain vague or overly broad stylistic descriptions.
+7. The expected output is an image with a **transparent background**, suitable for rendering and modeling use.`);
 
   const visionService = AihubmixVisionService.getInstance();
   const dalleService = AihubmixDalleService.getInstance();
@@ -113,24 +129,6 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       console.log('[AIGenerationPanel handleOneClickGenerate] 📸 分析画板内容...');
       const analysisStartTime = performance.now();
       
-      const systemPrompt = `You are a professional prompt-generation assistant specialized in collectible vinyl toy (潮玩) design. You are strictly limited to tasks within the domain of toy and figure design, and must never deviate from that scope.
-
-## Primary Task:
-Analyze the user's whiteboard sketch, which may include images, annotations, or doodles, and generate a high-quality English prompt suitable for image generation models (such as DALL·E 3). This prompt will be used to produce a rendering of the collectible figure.
-
-## Secondary Task:
-If the user-provided sketch is too abstract or ambiguous to determine clear subjects, themes, or styles, you may reference the following image as the primary inspiration: ${referenceImageBase64}
-
-## Strict Design Constraints:
-1. The design must describe a collectible character or creature suitable for full-color one-piece 3D printing at approximately 8cm in height.
-2. All design choices must consider real-world 3D printing feasibility at 8cm scale — no thin, fragile, or floating structures.
-3. The prompt must **not include any environment, scenery, background**, or abstract artistic elements — only the character or creature is allowed.
-4. The figure must have a distinct and recognizable **style or theme** (e.g., whale-inspired, bio-mechanical, cute sci-fi).
-5. The prompt must be **clear and structured**, describing the pose, silhouette, color scheme, and visual language of the design.
-6. The prompt must **not** contain vague or overly broad stylistic descriptions.
-7. The expected output is an image with a **transparent background**, suitable for rendering and modeling use.
-`;
-
       const analysisResult = await visionService.analyzeImage(
         canvasSnapshot,
         systemPrompt
@@ -215,7 +213,7 @@ If the user-provided sketch is too abstract or ambiguous to determine clear subj
       setIsLoading(false);
       console.log('[AIGenerationPanel handleOneClickGenerate] 🔄 清理加载状态');
     }
-  }, [canvasSnapshot, visionService, dalleService, loadReferenceImage]);
+  }, [canvasSnapshot, visionService, dalleService, loadReferenceImage, systemPrompt]);
 
   // 重置状态
   const handleReset = useCallback(() => {
@@ -303,6 +301,26 @@ If the user-provided sketch is too abstract or ambiguous to determine clear subj
             <div className="loading-spinner"></div>
             <h3>准备生成...</h3>
             <p>正在分析画板内容</p>
+            
+            {/* System Prompt 测试输入框 */}
+            <div className="system-prompt-editor">
+              <h4>System Prompt (测试用):</h4>
+              <textarea
+                value={systemPrompt}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                placeholder="输入System Prompt..."
+                rows={8}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontFamily: 'monospace',
+                  resize: 'vertical'
+                }}
+              />
+            </div>
             
             {/* 显示参考图片 */}
             <div className="reference-images">
