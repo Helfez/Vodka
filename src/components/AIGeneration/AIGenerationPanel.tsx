@@ -159,13 +159,20 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       console.log('  - 总耗时:', Math.round(generateEndTime - analysisStartTime), 'ms');
 
       // 第三步：保存生成的图片到存储服务并替换URL
-      console.log('[AIGenerationPanel handleOneClickGenerate] 💾 保存生成的图片...');
+      console.log('[AIGenerationPanel handleOneClickGenerate] 💾 开始处理生成的图片...');
+      console.log('  - 图片数量:', generationResult.images.length);
       const processedImages = [];
       
-      try {
-        for (const image of generationResult.images) {
-          // 上传到Cloudinary
-          console.log('[AIGenerationPanel handleOneClickGenerate] 📤 上传图片到Cloudinary...');
+      for (let i = 0; i < generationResult.images.length; i++) {
+        const image = generationResult.images[i];
+        console.log(`[AIGenerationPanel handleOneClickGenerate] 📤 处理第${i + 1}张图片...`);
+        console.log('  - 原始URL:', image.url);
+        
+        try {
+          // 尝试上传到Cloudinary
+          console.log('  - 开始上传到Cloudinary...');
+          const uploadStartTime = performance.now();
+          
           const uploadResponse = await fetch(`${window.location.origin}/.netlify/functions/upload-to-cloudinary`, {
             method: 'POST',
             headers: {
@@ -177,29 +184,54 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
             }),
           });
 
+          const uploadEndTime = performance.now();
+          console.log('  - 上传请求耗时:', Math.round(uploadEndTime - uploadStartTime), 'ms');
+          console.log('  - 响应状态:', uploadResponse.status);
+
           if (uploadResponse.ok) {
             const uploadResult = await uploadResponse.json();
-            if (uploadResult.success) {
-              console.log('[AIGenerationPanel handleOneClickGenerate] ✅ 图片已上传到Cloudinary:', uploadResult.cloudinaryUrl);
+            console.log('  - 上传响应:', uploadResult);
+            
+            if (uploadResult.success && uploadResult.cloudinaryUrl) {
+              console.log(`  - ✅ 第${i + 1}张图片上传成功!`);
+              console.log('  - Cloudinary URL:', uploadResult.cloudinaryUrl);
+              
               // 使用Cloudinary URL替换原始URL
               processedImages.push({
                 ...image,
-                url: uploadResult.cloudinaryUrl
+                url: uploadResult.cloudinaryUrl,
+                cloudinaryUrl: uploadResult.cloudinaryUrl,
+                originalUrl: image.url
               });
+              continue;
             } else {
-              console.warn('[AIGenerationPanel handleOneClickGenerate] ⚠️ Cloudinary上传失败，使用原始URL:', uploadResult.error);
-              processedImages.push(image);
+              console.error(`  - ❌ 第${i + 1}张图片上传失败:`, uploadResult.error);
             }
           } else {
-            console.warn('[AIGenerationPanel handleOneClickGenerate] ⚠️ 上传请求失败，使用原始URL:', uploadResponse.status);
-            processedImages.push(image);
+            const errorText = await uploadResponse.text();
+            console.error(`  - ❌ 第${i + 1}张图片上传请求失败:`, uploadResponse.status, errorText);
           }
+        } catch (uploadError) {
+          console.error(`  - ❌ 第${i + 1}张图片上传异常:`, uploadError);
         }
-      } catch (saveError) {
-        console.warn('[AIGenerationPanel handleOneClickGenerate] ⚠️ 图片保存失败，使用原始URL:', saveError);
-        // 保存失败时使用原始图片
-        processedImages.push(...generationResult.images);
+        
+        // 如果Cloudinary上传失败，使用图片代理URL作为备选
+        console.log(`  - ⚠️ 第${i + 1}张图片使用代理URL作为备选方案`);
+        const proxyUrl = `${window.location.origin}/.netlify/functions/image-proxy?url=${encodeURIComponent(image.url)}`;
+        console.log('  - 代理URL:', proxyUrl);
+        
+        processedImages.push({
+          ...image,
+          url: proxyUrl,
+          originalUrl: image.url,
+          isProxy: true
+        });
       }
+
+      console.log('[AIGenerationPanel handleOneClickGenerate] 📊 图片处理完成:');
+      console.log('  - 处理总数:', processedImages.length);
+      console.log('  - Cloudinary成功:', processedImages.filter(img => (img as any).cloudinaryUrl).length);
+      console.log('  - 代理URL:', processedImages.filter(img => (img as any).isProxy).length);
 
       // 第四步：显示结果（使用处理后的图片URL）
       setGeneratedImages(processedImages);
