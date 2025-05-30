@@ -64,6 +64,11 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       );
 
       console.log('[AIGenerationPanel] ✅ 分析完成，生成prompt长度:', analysisResult.analysis.length);
+      
+      // 打印完整的AI生成的提示词到控制台
+      console.log('[AIGenerationPanel] 📝 === AI生成的DALL-E提示词 ===');
+      console.log(analysisResult.analysis);
+      console.log('[AIGenerationPanel] 📝 === 提示词结束 ===');
 
       // 第二步：生成图片
       console.log('[AIGenerationPanel] 🎨 生成图片...');
