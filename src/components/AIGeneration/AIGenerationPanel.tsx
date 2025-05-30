@@ -1,7 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { AihubmixVisionService } from '../ImageSticker/services/aihubmix-vision.service';
 import { AihubmixDalleService } from '../ImageSticker/services/aihubmix-dalle.service';
-import './AIGenerationPanel.css';
 import { getSystemPromptWithImage, DEFAULT_SYSTEM_PROMPT } from '../../config/ai-prompts';
 
 interface AIGenerationPanelProps {
@@ -17,428 +16,126 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
   canvasSnapshot,
   onImageGenerated
 }) => {
-  const [generatedImages, setGeneratedImages] = useState<Array<{ url: string; revised_prompt?: string }>>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string>('');
-  const [analysisPrompt, setAnalysisPrompt] = useState<string>(''); // 存储AI分析返回的生图prompt
-  const [systemPrompt, setSystemPrompt] = useState<string>(''); // 先初始化为空，异步加载
-
+  const [systemPrompt, setSystemPrompt] = useState<string>('');
   const visionService = AihubmixVisionService.getInstance();
   const dalleService = AihubmixDalleService.getInstance();
 
   // 硬编码的参考图片URL
   const REFERENCE_IMAGE_URL = 'https://res.cloudinary.com/dqs6g6vrd/image/upload/v1748501675/wechat_2025-05-28_153406_424_rhmgt4.png';
 
-  // 组件加载时异步初始化systemPrompt
-  React.useEffect(() => {
+  // 组件初始化时加载System Prompt
+  useEffect(() => {
     const initializeSystemPrompt = async () => {
       try {
+        console.log('[AIGenerationPanel] 🔄 初始化System Prompt...');
         const fullSystemPrompt = await getSystemPromptWithImage(REFERENCE_IMAGE_URL);
         setSystemPrompt(fullSystemPrompt);
+        console.log('[AIGenerationPanel] ✅ System Prompt加载成功，长度:', fullSystemPrompt.length);
       } catch (error) {
-        console.error('初始化systemPrompt失败:', error);
-        setSystemPrompt(DEFAULT_SYSTEM_PROMPT('')); // 降级到无图片版本
+        console.error('[AIGenerationPanel] ❌ System Prompt加载失败:', error);
+        console.log('[AIGenerationPanel] 🔄 使用无图片版本的System Prompt');
+        const fallbackPrompt = DEFAULT_SYSTEM_PROMPT('');
+        setSystemPrompt(fallbackPrompt);
       }
     };
-    
+
+    // 先设置基础提示词，避免空白
+    setSystemPrompt(DEFAULT_SYSTEM_PROMPT(''));
+    // 然后异步加载完整版本
     initializeSystemPrompt();
   }, []);
 
-  // 加载参考图片为base64
-  const loadReferenceImage = useCallback(async (): Promise<string | null> => {
-    console.log('[AIGenerationPanel loadReferenceImage] 📸 开始加载参考图片...');
-    
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      
-      img.onload = () => {
-        try {
-          console.log('[AIGenerationPanel loadReferenceImage] ✅ 参考图片加载成功');
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          if (!ctx) {
-            console.error('[AIGenerationPanel loadReferenceImage] ❌ 无法获取canvas context');
-            resolve(null);
-            return;
-          }
-
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
-          
-          const base64 = canvas.toDataURL('image/jpeg', 0.8);
-          console.log('[AIGenerationPanel loadReferenceImage] 🔄 转换为base64完成，大小:', Math.round(base64.length / 1024), 'KB');
-          resolve(base64);
-        } catch (error) {
-          console.error('[AIGenerationPanel loadReferenceImage] ❌ 转换base64失败:', error);
-          resolve(null);
-        }
-      };
-
-      img.onerror = (error) => {
-        console.error('[AIGenerationPanel loadReferenceImage] ❌ 参考图片加载失败:', error);
-        resolve(null);
-      };
-
-      img.src = REFERENCE_IMAGE_URL;
-    });
-  }, []);
-
-  // 使用生成的图片
-  const handleUseImage = useCallback((imageUrl: string) => {
-    console.log('[AIGenerationPanel handleUseImage] === 图片使用流程开始 ===');
-    console.log('[AIGenerationPanel handleUseImage] 🖼️ 选择的图片URL:', imageUrl.substring(0, 50) + '...');
-    
-    onImageGenerated(imageUrl);
-    onClose();
-    
-    console.log('[AIGenerationPanel handleUseImage] ✅ 图片已传递给父组件');
-    console.log('[AIGenerationPanel handleUseImage] 🔄 关闭AI生成面板');
-    console.log('[AIGenerationPanel handleUseImage] === 图片使用流程完成 ===');
-  }, [onImageGenerated, onClose]);
-
   // 一键生成功能
   const handleOneClickGenerate = useCallback(async () => {
-    console.log('[AIGenerationPanel handleOneClickGenerate] === 一键生成流程开始 ===');
-    
     if (!canvasSnapshot) {
-      console.error('[AIGenerationPanel handleOneClickGenerate] ❌ 画板快照不可用');
-      setError('请先获取画板快照');
+      console.error('[AIGenerationPanel] ❌ 画板快照不可用');
+      onClose();
       return;
     }
 
-    console.log('[AIGenerationPanel handleOneClickGenerate] 📋 一键生成配置:');
-    console.log('  - 快照大小:', Math.round(canvasSnapshot.length / 1024), 'KB');
-    console.log('  - 使用固定System Prompt + 参考图片');
+    if (!systemPrompt) {
+      console.error('[AIGenerationPanel] ❌ System Prompt未加载');
+      alert('System Prompt未加载完成，请稍后重试');
+      onClose();
+      return;
+    }
 
-    setIsLoading(true);
-    setError('');
+    console.log('[AIGenerationPanel] === 开始AI图片生成流程 ===');
+    console.log('[AIGenerationPanel] 📋 使用System Prompt长度:', systemPrompt.length);
 
     try {
-      // 加载参考图片
-      console.log('[AIGenerationPanel handleOneClickGenerate] 📸 加载参考图片...');
-      const referenceImageBase64 = await loadReferenceImage();
+      // 第一步：使用已加载的系统提示词分析图像
+      console.log('[AIGenerationPanel] 📸 分析画板内容...');
       
-      if (referenceImageBase64) {
-        console.log('[AIGenerationPanel handleOneClickGenerate] ✅ 参考图片加载成功');
-      } else {
-        console.warn('[AIGenerationPanel handleOneClickGenerate] ⚠️ 参考图片加载失败，继续使用画板快照');
-      }
-
-      // 第一步：使用固定System Prompt分析图像
-      console.log('[AIGenerationPanel handleOneClickGenerate] 📸 分析画板内容...');
-      const analysisStartTime = performance.now();
-      
-      // 使用用户编辑的systemPrompt
       const analysisResult = await visionService.analyzeImage(
         canvasSnapshot,
-        systemPrompt
+        systemPrompt  // 使用已初始化的systemPrompt
       );
 
-      const analysisEndTime = performance.now();
-      const analysisTime = Math.round(analysisEndTime - analysisStartTime);
-      
-      console.log('[AIGenerationPanel handleOneClickGenerate] ✅ 分析完成:');
-      console.log('  - 分析耗时:', analysisTime, 'ms');
-      console.log('  - 优化prompt长度:', analysisResult.analysis.length, '字符');
-      console.log('  - 优化prompt预览:', analysisResult.analysis.substring(0, 100) + '...');
+      console.log('[AIGenerationPanel] ✅ 分析完成，生成prompt长度:', analysisResult.analysis.length);
 
-      const optimizedPrompt = analysisResult.analysis;
-      setAnalysisPrompt(optimizedPrompt); // 保存AI分析返回的prompt
-
-      // 第二步：直接使用优化后的prompt生成图片
-      console.log('[AIGenerationPanel handleOneClickGenerate] 🎨 使用优化prompt生成图片...');
-      
-      const generateStartTime = performance.now();
-      
-      const generationResult = await dalleService.generateImage(optimizedPrompt, {
+      // 第二步：生成图片
+      console.log('[AIGenerationPanel] 🎨 生成图片...');
+      const generationResult = await dalleService.generateImage(analysisResult.analysis, {
         n: 1,
         size: "1024x1024",
         quality: "standard",
         style: "vivid"
       });
 
-      const generateEndTime = performance.now();
-      const generateTime = Math.round(generateEndTime - generateStartTime);
-      
-      console.log('[AIGenerationPanel handleOneClickGenerate] ✅ 图片生成完成:');
-      console.log('  - 生成耗时:', generateTime, 'ms');
-      console.log('  - 生成图片数量:', generationResult.images.length);
-      console.log('  - 总耗时:', Math.round(generateEndTime - analysisStartTime), 'ms');
+      if (generationResult?.images?.length > 0) {
+        const image = generationResult.images[0];
+        console.log('[AIGenerationPanel] ✅ 图片生成成功');
 
-      // 第三步：保存生成的图片到存储服务并替换URL
-      console.log('[AIGenerationPanel handleOneClickGenerate] 💾 开始处理生成的图片...');
-      console.log('  - 图片数量:', generationResult.images.length);
-      const processedImages = [];
-      
-      // 图片可用性验证函数
-      const verifyImageAvailability = async (imageUrl: string, maxRetries = 3, retryDelay = 1000): Promise<boolean> => {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            console.log(`    - 验证图片可用性 (第${attempt}次尝试)...`);
-            
-            const response = await fetch(imageUrl, { 
-              method: 'HEAD',
-              cache: 'no-cache'
-            });
-            
-            if (response.ok) {
-              console.log(`    - ✅ 图片验证成功 (第${attempt}次尝试)`);
-              return true;
-            } else {
-              console.log(`    - ❌ 图片验证失败 (第${attempt}次尝试): ${response.status}`);
-            }
-          } catch (error) {
-            console.log(`    - ❌ 图片验证异常 (第${attempt}次尝试):`, error);
-          }
-          
-          if (attempt < maxRetries) {
-            console.log(`    - ⏳ 等待${retryDelay}ms后重试...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-          }
-        }
-        
-        console.log(`    - ❌ 图片验证最终失败 (${maxRetries}次尝试)`);
-        return false;
-      };
-      
-      for (let i = 0; i < generationResult.images.length; i++) {
-        const image = generationResult.images[i];
-        console.log(`[AIGenerationPanel handleOneClickGenerate] 📤 处理第${i + 1}张图片...`);
-        console.log('  - 原始URL:', image.url);
-        
+        // 第三步：上传到Cloudinary
+        console.log('[AIGenerationPanel] 📤 上传到Cloudinary...');
         try {
-          // 尝试上传到Cloudinary
-          console.log('  - 开始上传到Cloudinary...');
-          const uploadStartTime = performance.now();
-          
           const uploadResponse = await fetch(`${window.location.origin}/.netlify/functions/upload-to-cloudinary`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               imageUrl: image.url,
-              prompt: optimizedPrompt
+              prompt: analysisResult.analysis
             }),
           });
 
-          const uploadEndTime = performance.now();
-          console.log('  - 上传请求耗时:', Math.round(uploadEndTime - uploadStartTime), 'ms');
-          console.log('  - 响应状态:', uploadResponse.status);
-
           if (uploadResponse.ok) {
             const uploadResult = await uploadResponse.json();
-            console.log('  - 上传响应:', uploadResult);
-            
             if (uploadResult.success && uploadResult.cloudinaryUrl) {
-              console.log(`  - ✅ 第${i + 1}张图片上传成功!`);
-              console.log('  - Cloudinary URL:', uploadResult.cloudinaryUrl);
-              
-              // 验证图片是否真正可用
-              console.log('  - 🔍 验证图片可用性...');
-              const isImageAvailable = await verifyImageAvailability(uploadResult.cloudinaryUrl);
-              
-              if (isImageAvailable) {
-                console.log(`  - ✅ 第${i + 1}张图片验证成功，可以使用!`);
-                
-                // 使用Cloudinary URL替换原始URL
-                processedImages.push({
-                  ...image,
-                  url: uploadResult.cloudinaryUrl,
-                  cloudinaryUrl: uploadResult.cloudinaryUrl,
-                  originalUrl: image.url
-                });
-                continue;
-              } else {
-                console.error(`  - ❌ 第${i + 1}张图片上传成功但验证失败，使用代理备选`);
-              }
-            } else {
-              console.error(`  - ❌ 第${i + 1}张图片上传失败:`, uploadResult.error);
+              console.log('[AIGenerationPanel] ✅ Cloudinary上传成功');
+              onImageGenerated(uploadResult.cloudinaryUrl);
+              onClose();
+              return;
             }
-          } else {
-            const errorText = await uploadResponse.text();
-            console.error(`  - ❌ 第${i + 1}张图片上传请求失败:`, uploadResponse.status, errorText);
           }
+          
+          console.warn('[AIGenerationPanel] ⚠️ Cloudinary上传失败，使用原始URL');
         } catch (uploadError) {
-          console.error(`  - ❌ 第${i + 1}张图片上传异常:`, uploadError);
+          console.error('[AIGenerationPanel] ❌ 上传异常:', uploadError);
         }
-        
-        // 如果Cloudinary上传失败或验证失败，使用图片代理URL作为备选
-        console.log(`  - ⚠️ 第${i + 1}张图片使用代理URL作为备选方案`);
-        const proxyUrl = `${window.location.origin}/.netlify/functions/image-proxy?url=${encodeURIComponent(image.url)}`;
-        console.log('  - 代理URL:', proxyUrl);
-        
-        processedImages.push({
-          ...image,
-          url: proxyUrl,
-          originalUrl: image.url,
-          isProxy: true
-        });
+
+        // 如果上传失败，直接使用原始URL
+        onImageGenerated(image.url);
+        onClose();
+      } else {
+        throw new Error('没有生成任何图片');
       }
 
-      console.log('[AIGenerationPanel handleOneClickGenerate] 📊 图片处理完成:');
-      console.log('  - 处理总数:', processedImages.length);
-      console.log('  - Cloudinary成功:', processedImages.filter(img => (img as any).cloudinaryUrl).length);
-      console.log('  - 代理URL:', processedImages.filter(img => (img as any).isProxy).length);
-
-      // 详细显示每个图片的URL信息
-      console.log('[AIGenerationPanel handleOneClickGenerate] 🔍 处理后的图片详情:');
-      processedImages.forEach((img, index) => {
-        console.log(`  图片${index + 1}:`);
-        console.log(`    - 最终URL: ${img.url}`);
-        console.log(`    - 原始URL: ${(img as any).originalUrl || 'N/A'}`);
-        console.log(`    - Cloudinary URL: ${(img as any).cloudinaryUrl || 'N/A'}`);
-        console.log(`    - 是否代理: ${(img as any).isProxy || false}`);
-      });
-
-      // 第四步：显示结果（使用处理后的图片URL）
-      setGeneratedImages(processedImages);
-      
-      console.log('[AIGenerationPanel handleOneClickGenerate] ✅ 一键生成完成');
-      console.log('[AIGenerationPanel handleOneClickGenerate] === 一键生成流程完成 ===');
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '一键生成失败';
-      console.error('[AIGenerationPanel handleOneClickGenerate] ❌ 一键生成失败:', error);
-      console.error('  - 错误类型:', error instanceof Error ? error.constructor.name : typeof error);
-      console.error('  - 错误消息:', errorMessage);
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-      console.log('[AIGenerationPanel handleOneClickGenerate] 🔄 清理加载状态');
+      console.error('[AIGenerationPanel] ❌ AI生成失败:', error);
+      alert('AI图片生成失败: ' + (error instanceof Error ? error.message : '未知错误'));
+      onClose();
     }
-  }, [canvasSnapshot, visionService, dalleService, loadReferenceImage, systemPrompt]);
+  }, [canvasSnapshot, systemPrompt, visionService, dalleService, onImageGenerated, onClose]);
 
-  // 重置状态
-  const handleReset = useCallback(() => {
-    console.log('[AIGenerationPanel handleReset] === 重置流程开始 ===');
-    console.log('[AIGenerationPanel handleReset] 🔄 清理所有状态...');
-    
-    setGeneratedImages([]);
-    setError('');
-    setAnalysisPrompt(''); // 清空分析prompt
-    
-    console.log('[AIGenerationPanel handleReset] ✅ 状态重置完成，将重新生成');
-    console.log('[AIGenerationPanel handleReset] === 重置流程完成 ===');
-    
-    // 重置后自动重新生成
-    setTimeout(() => {
+  // 面板打开时自动开始生成（但要等systemPrompt加载完成）
+  useEffect(() => {
+    if (isOpen && canvasSnapshot && systemPrompt) {
+      console.log('[AIGenerationPanel] 🚀 面板打开，System Prompt已就绪，开始生成');
       handleOneClickGenerate();
-    }, 100);
-  }, [handleOneClickGenerate]);
+    }
+  }, [isOpen, canvasSnapshot, systemPrompt, handleOneClickGenerate]);
 
-  if (!isOpen) return null;
-
-  return (
-    <div className="ai-generation-overlay">
-      <div className="ai-generation-panel">
-        <div className="panel-header">
-          <h2>一键生成</h2>
-          <button className="close-button" onClick={onClose}>×</button>
-        </div>
-
-        {/* System Prompt 编辑区域 - 始终显示 */}
-        <div className="system-prompt-section">
-          <div className="section-header">
-            <h4>🎯 System Prompt 编辑</h4>
-            <button 
-              className="generate-button"
-              onClick={handleOneClickGenerate}
-              disabled={isLoading}
-            >
-              {isLoading ? '生成中...' : '🚀 生成图片'}
-            </button>
-          </div>
-          <textarea
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            placeholder="输入System Prompt..."
-            rows={6}
-            className="system-prompt-textarea"
-          />
-          
-          {/* 显示参考图片 */}
-          <div className="reference-images">
-            <h5>📸 参考图片：</h5>
-            <div className="reference-grid">
-              <div className="reference-item">
-                <img src={REFERENCE_IMAGE_URL} alt="参考图片" />
-                <span className="reference-index">1</span>
-              </div>
-            </div>
-            <p className="reference-note">AI将参考这张图片的风格和元素</p>
-          </div>
-        </div>
-
-        {/* 显示AI分析返回的生图prompt */}
-        {analysisPrompt && (
-          <div className="analysis-prompt-section">
-            <h4>🤖 AI分析返回的生图Prompt</h4>
-            <div className="analysis-prompt-content">
-              <pre>{analysisPrompt}</pre>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="error-message">
-            <span>⚠️ {error}</span>
-            <button onClick={() => setError('')}>×</button>
-          </div>
-        )}
-
-        {/* 加载状态 */}
-        {isLoading && (
-          <div className="loading-content">
-            <div className="loading-spinner"></div>
-            <h3>AI正在生成图片...</h3>
-            <p>请稍候，这可能需要几秒钟时间</p>
-          </div>
-        )}
-
-        {/* 生成结果 */}
-        {!isLoading && generatedImages.length > 0 && (
-          <div className="result-content">
-            <h3>生成完成</h3>
-            <p>选择一张图片添加到画板：</p>
-            
-            <div className="generated-images">
-              {generatedImages.map((image, index) => (
-                <div key={index} className="generated-image">
-                  <img src={image.url} alt={`Generated ${index + 1}`} />
-                  <div className="image-actions">
-                    <button 
-                      className="use-image-button"
-                      onClick={() => handleUseImage(image.url)}
-                    >
-                      使用此图片
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="result-actions">
-              <button className="secondary-button" onClick={handleReset}>
-                重新生成
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 初始状态 */}
-        {!isLoading && generatedImages.length === 0 && !error && (
-          <div className="initial-content">
-            <div className="welcome-message">
-              <h3>🎨 AI图片生成器</h3>
-              <p>编辑上方的System Prompt，然后点击"生成图片"按钮开始</p>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  // 不渲染任何UI
+  return null;
 }; 
