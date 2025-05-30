@@ -21,13 +21,28 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [analysisPrompt, setAnalysisPrompt] = useState<string>(''); // 存储AI分析返回的生图prompt
-  const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT(''));
+  const [systemPrompt, setSystemPrompt] = useState<string>(''); // 先初始化为空，异步加载
 
   const visionService = AihubmixVisionService.getInstance();
   const dalleService = AihubmixDalleService.getInstance();
 
   // 硬编码的参考图片URL
   const REFERENCE_IMAGE_URL = 'https://res.cloudinary.com/dqs6g6vrd/image/upload/v1748501675/wechat_2025-05-28_153406_424_rhmgt4.png';
+
+  // 组件加载时异步初始化systemPrompt
+  React.useEffect(() => {
+    const initializeSystemPrompt = async () => {
+      try {
+        const fullSystemPrompt = await getSystemPromptWithImage(REFERENCE_IMAGE_URL);
+        setSystemPrompt(fullSystemPrompt);
+      } catch (error) {
+        console.error('初始化systemPrompt失败:', error);
+        setSystemPrompt(DEFAULT_SYSTEM_PROMPT('')); // 降级到无图片版本
+      }
+    };
+    
+    initializeSystemPrompt();
+  }, []);
 
   // 加载参考图片为base64
   const loadReferenceImage = useCallback(async (): Promise<string | null> => {
