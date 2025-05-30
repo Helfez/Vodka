@@ -274,6 +274,16 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       console.log('  - Cloudinary成功:', processedImages.filter(img => (img as any).cloudinaryUrl).length);
       console.log('  - 代理URL:', processedImages.filter(img => (img as any).isProxy).length);
 
+      // 详细显示每个图片的URL信息
+      console.log('[AIGenerationPanel handleOneClickGenerate] 🔍 处理后的图片详情:');
+      processedImages.forEach((img, index) => {
+        console.log(`  图片${index + 1}:`);
+        console.log(`    - 最终URL: ${img.url}`);
+        console.log(`    - 原始URL: ${(img as any).originalUrl || 'N/A'}`);
+        console.log(`    - Cloudinary URL: ${(img as any).cloudinaryUrl || 'N/A'}`);
+        console.log(`    - 是否代理: ${(img as any).isProxy || false}`);
+      });
+
       // 第四步：显示结果（使用处理后的图片URL）
       setGeneratedImages(processedImages);
       
