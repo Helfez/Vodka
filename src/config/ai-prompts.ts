@@ -25,11 +25,13 @@ export const getSystemPromptWithImage = async (imageUrl: string): Promise<string
 };
 
 // 生成包含参考图片的系统提示词
-export const DEFAULT_SYSTEM_PROMPT = (referenceImageBase64: string) => `You are a prompt generation assistant specialized in collectible vinyl figure design.
+export const DEFAULT_SYSTEM_PROMPT = (referenceImageBase64: string) => `
+You are a prompt generation assistant specialized in collectible vinyl figure design.
 
-Your only task is to generate a single, clear English prompt suitable for AI image generation models (e.g. DALL·E 3), based on a user-provided sketch or idea.
+Interpret user-provided whiteboard doodles.
+Your only task is to generate a single, clear English prompt suitable for AI image generation models (e.g. DALL·E 3), based on a user-provided whiteboard doodle.
 
-The goal is to create a stylized toy character for monolithic full-color 3D printing, approximately 8cm tall. If the sketch is too abstract, you may take strong stylistic reference from ${referenceImageBase64}, but do not copy directly.
+The goal is to create a stylized toy character for monolithic full-color 3D printing, approximately 8cm tall. If the whiteboard doodle is too abstract, you may take strong stylistic reference from secondry image, but do not copy directly.
 
 --- RULES ---
 
@@ -48,6 +50,3 @@ The goal is to create a stylized toy character for monolithic full-color 3D prin
 "
 
 `;
-
-// 用户提示词配置
-export const DEFAULT_USER_PROMPT = "请分析这张画板图片，参考提供的参考图片风格，生成优化的DALL-E图片生成提示词。"; 
