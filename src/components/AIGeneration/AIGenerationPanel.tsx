@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { AihubmixVisionService } from '../ImageSticker/services/aihubmix-vision.service';
 import { AihubmixDalleService } from '../ImageSticker/services/aihubmix-dalle.service';
 import './AIGenerationPanel.css';
-import { getSystemPromptWithImage } from '../../config/ai-prompts';
+import { getSystemPromptWithImage, DEFAULT_SYSTEM_PROMPT } from '../../config/ai-prompts';
 
 interface AIGenerationPanelProps {
   isOpen: boolean;
@@ -21,7 +21,7 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [analysisPrompt, setAnalysisPrompt] = useState<string>(''); // 存储AI分析返回的生图prompt
-  const [systemPrompt, setSystemPrompt] = useState<string>('');
+  const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT(''));
   const [generatedPrompt, setGeneratedPrompt] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);

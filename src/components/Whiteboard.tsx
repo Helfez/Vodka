@@ -11,7 +11,6 @@ import { FloatingButton } from './ImageSticker/components/FloatingButton';
 import { FloatingButtonPosition } from './ImageSticker/services/types';
 import { LogViewer } from './LogViewer/LogViewer';
 import { AIGenerationPanel } from './AIGeneration/AIGenerationPanel';
-import { DEFAULT_SYSTEM_PROMPT } from '../config/ai-prompts';
 
 // Type alias for Fabric.js Canvas instance with custom properties if any
 // (Currently, freeDrawingBrush is a standard property but explicitly typed for clarity)
