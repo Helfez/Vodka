@@ -1,12 +1,86 @@
 .App {
-  text-align: center;
-  height: 100vh;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 30px 20px;
+  background: transparent;
 }
 
 #root {
-  height: 100vh;
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* 手账风格的标题 */
+.journal-header {
+  text-align: center;
+  margin-bottom: 40px;
+  color: #8b5a2b;
+  font-weight: 600;
+  font-size: 2.2rem;
+  text-shadow: 0 2px 4px rgba(139, 90, 43, 0.1);
+  position: relative;
+}
+
+.journal-header::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #d4a574, transparent);
+}
+
+/* 手账风格的容器 */
+.journal-container {
+  background: linear-gradient(145deg, #faf8f4 0%, #f5f1eb 100%);
+  border-radius: 20px;
+  box-shadow: 
+    0 15px 35px rgba(139, 90, 43, 0.1),
+    0 5px 15px rgba(139, 90, 43, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(212, 165, 116, 0.2);
+  padding: 30px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 装饰性边框 */
+.journal-container::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  border: 1px dashed rgba(139, 90, 43, 0.15);
+  border-radius: 15px;
+  pointer-events: none;
+}
+
+/* 手账风格的装饰元素 */
+.journal-decoration {
+  position: absolute;
+  color: rgba(139, 90, 43, 0.1);
+  font-size: 120px;
+  user-select: none;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.journal-decoration.top-left {
+  top: -20px;
+  left: -20px;
+  transform: rotate(-15deg);
+}
+
+.journal-decoration.bottom-right {
+  bottom: -30px;
+  right: -30px;
+  transform: rotate(15deg);
 }
 
 .whiteboard-wrapper {

@@ -1,23 +1,92 @@
+/* 手账风格工具栏 */
 .toolbar {
-  padding: 10px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid #eee;
+  padding: 15px 25px;
+  margin-bottom: 15px;
+  background: linear-gradient(145deg, #f8f5f1 0%, #f0e6d6 100%);
+  border-radius: 15px;
+  border: 2px solid rgba(139, 90, 43, 0.15);
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 20px;
+  box-shadow: 
+    0 4px 8px rgba(139, 90, 43, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  position: relative;
+  overflow: hidden;
+}
+
+.toolbar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d4a574' fill-opacity='0.05'%3E%3Cpath d='M20 20c0-11.046-8.954-20-20-20v20h20z'/%3E%3C/g%3E%3C/svg%3E");
+  pointer-events: none;
 }
 
 .brush-size {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.4);
+  padding: 8px 15px;
+  border-radius: 10px;
+  border: 1px solid rgba(139, 90, 43, 0.1);
+  position: relative;
+  z-index: 1;
 }
 
 .brush-size label {
   font-size: 14px;
-  color: #333;
+  font-weight: 500;
+  color: #8b5a2b;
+  font-family: 'Klee One', sans-serif;
+  white-space: nowrap;
 }
 
 .brush-size input {
-  width: 100px;
+  width: 120px;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(to right, #e8dcc6, #d4a574);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.brush-size input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #d4a574, #c49660);
+  border: 2px solid #8b5a2b;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(139, 90, 43, 0.3);
+  transition: all 0.2s ease;
+}
+
+.brush-size input::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 6px rgba(139, 90, 43, 0.4);
+}
+
+.brush-size input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #d4a574, #c49660);
+  border: 2px solid #8b5a2b;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(139, 90, 43, 0.3);
+  transition: all 0.2s ease;
+}
+
+.brush-size input::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 6px rgba(139, 90, 43, 0.4);
 }
