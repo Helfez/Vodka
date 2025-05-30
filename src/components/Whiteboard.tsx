@@ -10,9 +10,8 @@ import { PhotoEffect } from './ImageUpload/PhotoEffect/PhotoEffect';
 import { FloatingButton } from './ImageSticker/components/FloatingButton';
 import { FloatingButtonPosition } from './ImageSticker/services/types';
 import { LogViewer } from './LogViewer/LogViewer';
+import { AIGenerationPanel } from './AIGeneration/AIGenerationPanel';
 import { DEFAULT_SYSTEM_PROMPT } from '../config/ai-prompts';
-import { AihubmixVisionService } from './ImageSticker/services/aihubmix-vision.service';
-import { AihubmixDalleService } from './ImageSticker/services/aihubmix-dalle.service';
 
 // Type alias for Fabric.js Canvas instance with custom properties if any
 // (Currently, freeDrawingBrush is a standard property but explicitly typed for clarity)
@@ -78,16 +77,6 @@ const Whiteboard = ({
 
   // State for log viewer
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
-
-  // State for AI prompt sidebar and related AI logic
-  const [isPromptSidebarOpen, setIsPromptSidebarOpen] = useState(false);
-  const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT(''));
-  const [generatedPrompt, setGeneratedPrompt] = useState<string>('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  const visionService = AihubmixVisionService.getInstance();
-  const dalleService = AihubmixDalleService.getInstance();
 
   // --- Callbacks --- 
 
@@ -173,7 +162,21 @@ const Whiteboard = ({
     }
   }, [fabricCanvasRef]); // Removed setCanvasSnapshot from deps as it's directly in function
 
-  // 处理AI生成的图片 (Remains largely the same)
+  // New: "生图" button's main handler - 改为打开AIGenerationPanel
+  const handleDirectImageGeneration = useCallback(async () => {
+    console.log('[Whiteboard handleDirectImageGeneration] === Opening AI Generation Panel ===');
+    
+    // 获取画布快照
+    const snapshot = getCanvasSnapshotDataURL();
+    if (snapshot) {
+      setCanvasSnapshot(snapshot);
+      setIsAIGenerationOpen(true);
+    } else {
+      alert('无法获取画板快照，请重试');
+    }
+  }, [getCanvasSnapshotDataURL]);
+
+  // 处理AI生成的图片
   const handleAIImageGenerated = useCallback((imageUrl: string) => {
     console.log('[Whiteboard handleAIImageGenerated] === AI图片集成开始 ===');
     console.log('[Whiteboard handleAIImageGenerated] 📥 接收到图片URL:', imageUrl.substring(0, 50) + '...');
@@ -202,9 +205,8 @@ const Whiteboard = ({
           x: canvas.getWidth() / 2,
           y: canvas.getHeight() / 2
         };
-        // Adjust positioning logic if needed, e.g., make it smarter
         const imagePosition = {
-          x: clickPosition?.x || canvasCenter.x - img.width / 4, // Use click position if available
+          x: clickPosition?.x || canvasCenter.x - img.width / 4,
           y: clickPosition?.y || canvasCenter.y - img.height / 4
         };
         
@@ -230,14 +232,10 @@ const Whiteboard = ({
 
         console.log('[Whiteboard handleAIImageGenerated] 💾 记录历史状态...');
         requestAnimationFrame(() => {
-          const historyStartTime = performance.now();
-          recordState(); // Use the existing recordState function
-          const historyEndTime = performance.now();
-          console.log('[Whiteboard handleAIImageGenerated] ✅ 历史状态已记录 (approx time):', Math.round(historyEndTime - historyStartTime), 'ms');
+          recordState();
         });
 
         console.log('[Whiteboard handleAIImageGenerated] ✅ AI图片集成完成');
-        console.log('[Whiteboard handleAIImageGenerated] === AI图片集成结束 ===');
       } catch (error) {
         console.error('[Whiteboard handleAIImageGenerated] ❌ 图片添加到画布失败:', error);
       }
@@ -245,117 +243,10 @@ const Whiteboard = ({
 
     img.onerror = (errorEvent) => {
       console.error('[Whiteboard handleAIImageGenerated] ❌ 图片加载失败:', errorEvent);
-      console.error('  - 图片URL:', imageUrl);
-      console.error('  - 加载耗时:', Math.round(performance.now() - loadStartTime), 'ms');
-       // More detailed error logging
-       if (typeof errorEvent === 'string') {
-        console.error('  - Error message (string):', errorEvent);
-      } else if (errorEvent instanceof Event) {
-        console.error('  - Event type:', errorEvent.type);
-        // Check for target and other properties if available and relevant
-        if (errorEvent.target && (errorEvent.target as HTMLImageElement).src) {
-          console.error('  - Error source (img.src):', (errorEvent.target as HTMLImageElement).src);
-        }
-      } else {
-        console.error('  - Error object:', errorEvent);
-      }
     };
 
     img.src = imageUrl;
-  }, [clickPosition, recordState]); // Added recordState, clickPosition is used
-
-  // New: Analyze canvas and update generatedPrompt state
-  const handleAnalyzeCanvas = useCallback(async (currentSystemPrompt: string): Promise<string | null> => {
-    console.log('[Whiteboard handleAnalyzeCanvas] === Canvas Analysis Initiated ===');
-    setIsAnalyzing(true);
-    setGeneratedPrompt(''); 
-
-    const snapshotDataURL = getCanvasSnapshotDataURL();
-    if (!snapshotDataURL) {
-      setIsAnalyzing(false);
-      console.error('[Whiteboard handleAnalyzeCanvas] ❌ Analysis failed: Could not get canvas snapshot.');
-      setGeneratedPrompt('错误：无法获取画板快照进行分析。');
-      return null;
-    }
-
-    try {
-      console.log('[Whiteboard handleAnalyzeCanvas] 🧠 Calling vision service...');
-      console.log('  - System Prompt used (first 100 chars):', currentSystemPrompt.substring(0, 100) + '...');
-      
-      const analysisResult = await visionService.analyzeImage(snapshotDataURL, currentSystemPrompt);
-      const newPrompt = analysisResult.analysis || '错误: 未能从AI分析结果中提取有效的Prompt。';
-      
-      console.log('[Whiteboard handleAnalyzeCanvas] ✅ Analysis successful. Generated prompt (first 100 chars):', newPrompt.substring(0, 100) + '...');
-      setGeneratedPrompt(newPrompt);
-      return newPrompt;
-    } catch (error) {
-      console.error('[Whiteboard handleAnalyzeCanvas] ❌ Error during canvas analysis:', error);
-      const errorMessage = error instanceof Error ? error.message : '未知分析错误';
-      setGeneratedPrompt(`分析时发生错误: ${errorMessage.substring(0,100)}...`);
-      return null;
-    } finally {
-      setIsAnalyzing(false);
-      console.log('[Whiteboard handleAnalyzeCanvas] === Canvas Analysis Completed (Success or Failure) ===');
-    }
-  }, [getCanvasSnapshotDataURL, visionService]);
-
-  // New: Generate image using a given prompt
-  const handleGenerateImageFromPrompt = useCallback(async (promptToUse: string) => {
-    console.log('[Whiteboard handleGenerateImageFromPrompt] === Image Generation Initiated ===');
-    if (!promptToUse || promptToUse.startsWith('错误:')) {
-      console.error('[Whiteboard handleGenerateImageFromPrompt] ❌ Invalid or missing prompt for image generation:', promptToUse);
-      alert('错误：没有有效Prompt可用于生成图片。请先成功分析画板。');
-      return;
-    }
-    setIsGenerating(true);
-
-    try {
-      console.log('[Whiteboard handleGenerateImageFromPrompt] 🎨 Calling DALL-E service with prompt (first 100 chars):', promptToUse.substring(0,100) + '...');
-      
-      const generationResult = await dalleService.generateImage(promptToUse, {
-        n: 1,
-        size: "1024x1024",
-        quality: "standard",
-        style: "vivid"
-      });
-
-      if (generationResult && generationResult.images && generationResult.images.length > 0 && generationResult.images[0].url) {
-        const imageUrl = generationResult.images[0].url;
-        console.log('[Whiteboard handleGenerateImageFromPrompt] ✅ Image generation successful. Image URL (first 50 chars):', imageUrl.substring(0, 50) + '...');
-        handleAIImageGenerated(imageUrl); 
-      } else {
-        console.error('[Whiteboard handleGenerateImageFromPrompt] ❌ Could not find image URL in DALL-E service response:', generationResult);
-        alert('错误：未能从AI服务响应中找到图片URL。');
-        throw new Error('Image URL not found in DALL-E service response.');
-      }
-    } catch (error) {
-      console.error('[Whiteboard handleGenerateImageFromPrompt] ❌ Error during image generation:', error);
-      const errorMessage = error instanceof Error ? error.message : '未知图片生成错误';
-      alert(`图片生成时发生错误: ${errorMessage.substring(0,100)}...`);
-    } finally {
-      setIsGenerating(false);
-      console.log('[Whiteboard handleGenerateImageFromPrompt] === Image Generation Completed (Success or Failure) ===');
-    }
-  }, [handleAIImageGenerated, dalleService]);
-
-  // New: "生图" button's main handler
-  const handleDirectImageGeneration = useCallback(async () => {
-    console.log('[Whiteboard handleDirectImageGeneration] === Direct Image Generation Flow Started ===');
-    // Ensure sidebar is open to show prompts, or open it.
-    if (!isPromptSidebarOpen) {
-        setIsPromptSidebarOpen(true);
-    }
-
-    const analysisPrompt = await handleAnalyzeCanvas(systemPrompt);
-    
-    if (analysisPrompt && !analysisPrompt.startsWith('错误:')) {
-      await handleGenerateImageFromPrompt(analysisPrompt);
-    } else {
-      console.error('[Whiteboard handleDirectImageGeneration] ❌ Flow aborted: Analysis did not return a valid prompt.');
-      alert('错误：AI分析未能成功生成有效的Prompt，无法继续生图。请检查侧边栏中的分析结果。');
-    }
-    console.log('[Whiteboard handleDirectImageGeneration] === Direct Image Generation Flow Ended ===');
-  }, [systemPrompt, handleAnalyzeCanvas, handleGenerateImageFromPrompt, isPromptSidebarOpen, setIsPromptSidebarOpen]);
+  }, [clickPosition, recordState]);
 
   // --- Effects --- 
 
@@ -640,16 +531,9 @@ const Whiteboard = ({
           className="ai-generation-btn"
           onClick={handleDirectImageGeneration} // Updated onClick
           title="AI分析画板并自动生成图片"
-          disabled={isAnalyzing || isGenerating}
+          disabled={isAIGenerationOpen}
         >
-          {isGenerating ? '🎨 生成中...' : (isAnalyzing ? '🧠 分析中...' : '🎨 生图')}
-        </button>
-        <button
-          className="ai-generation-btn" // Consider a different class if styles diverge
-          onClick={() => setIsPromptSidebarOpen(prev => !prev)} // Toggle sidebar
-          title={isPromptSidebarOpen ? "关闭AI分析工具" : "打开AI分析工具"}
-        >
-          {isPromptSidebarOpen ? '✖️ 关闭工具' : '🤖 AI工具'}
+          {isAIGenerationOpen ? '🎨 生成中...' : '🎨 生图'}
         </button>
         <button 
           className="log-viewer-button"
@@ -658,7 +542,6 @@ const Whiteboard = ({
         >
           📊 日志
         </button>
-        {/* Removed the extra close button, toggle is now on the AI工具 button itself */}
       </div>
 
       <div className="whiteboard-main-content">
@@ -694,69 +577,15 @@ const Whiteboard = ({
             />
           )}
         </div>
-
-        {/* AI Prompt 侧边栏 */}
-        {isPromptSidebarOpen && (
-          <div className="ai-prompt-sidebar">
-            <div className="sidebar-header">
-              <h3>🤖 AI分析工具</h3>
-              {/* Close button inside sidebar can be kept or rely on toggle button */}
-              <button 
-                className="sidebar-close-btn-internal" // new class if styling needed
-                onClick={() => setIsPromptSidebarOpen(false)}
-                title="关闭AI分析工具侧边栏"
-              >
-                ×
-              </button>
-            </div>
-            <div className="sidebar-content">
-              {/* System Prompt 编辑器 */}
-              <div className="system-prompt-section">
-                <h4>🎯 System Prompt 编辑</h4>
-                <textarea
-                  value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
-                  placeholder="输入System Prompt..."
-                  rows={10} 
-                  className="system-prompt-textarea"
-                  disabled={isAnalyzing || isGenerating}
-                />
-                <button 
-                  className="analyze-button-sidebar" 
-                  onClick={() => handleAnalyzeCanvas(systemPrompt)}
-                  disabled={isAnalyzing || isGenerating}
-                  title="使用当前System Prompt分析画板，结果将显示在下方"
-                >
-                  {isAnalyzing && !isGenerating ? '🧠 分析中...' : '🚀 分析画板'}
-                </button>
-              </div>
-
-              {/* AI分析结果 */}
-              {(generatedPrompt || (isAnalyzing && !isGenerating) ) && ( 
-                <div className="prompt-display-section">
-                  <h4>📝 AI分析返回的生图Prompt:</h4>
-                  {isAnalyzing && !isGenerating && !generatedPrompt && <p>分析中，请稍候...</p>}
-                  {generatedPrompt && (
-                    <div className="prompt-text">
-                      <pre>{generatedPrompt}</pre>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* AI生成面板 - Commented out as per new flow */}
-      {/* 
+      {/* AI生成面板 */}
       <AIGenerationPanel
         isOpen={isAIGenerationOpen} 
         onClose={() => setIsAIGenerationOpen(false)}
         canvasSnapshot={canvasSnapshot}
         onImageGenerated={handleAIImageGenerated}
-      /> 
-      */}
+      />
 
       {/* 日志查看器 */}
       <LogViewer
