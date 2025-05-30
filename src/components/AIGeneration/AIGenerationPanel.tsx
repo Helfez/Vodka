@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import { AihubmixVisionService } from '../ImageSticker/services/aihubmix-vision.service';
 import { AihubmixDalleService } from '../ImageSticker/services/aihubmix-dalle.service';
-import { getSystemPromptWithImage, DEFAULT_SYSTEM_PROMPT } from '../../config/ai-prompts';
+import { DEFAULT_SYSTEM_PROMPT } from '../../config/ai-prompts';
 
 interface AIGenerationPanelProps {
   isOpen: boolean;
@@ -16,6 +16,7 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
   canvasSnapshot,
   onImageGenerated
 }) => {
+
   const [systemPrompt, setSystemPrompt] = useState<string>('');
   const visionService = AihubmixVisionService.getInstance();
   const dalleService = AihubmixDalleService.getInstance();
