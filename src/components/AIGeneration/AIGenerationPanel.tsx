@@ -25,24 +25,12 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
 
   // 组件初始化时加载System Prompt
   useEffect(() => {
-    const initializeSystemPrompt = async () => {
-      try {
-        console.log('[AIGenerationPanel] 🔄 初始化System Prompt...');
-        const fullSystemPrompt = await getSystemPromptWithImage(REFERENCE_IMAGE_URL);
-        setSystemPrompt(fullSystemPrompt);
-        console.log('[AIGenerationPanel] ✅ System Prompt加载成功，长度:', fullSystemPrompt.length);
-      } catch (error) {
-        console.error('[AIGenerationPanel] ❌ System Prompt加载失败:', error);
-        console.log('[AIGenerationPanel] 🔄 使用无图片版本的System Prompt');
-        const fallbackPrompt = DEFAULT_SYSTEM_PROMPT('');
-        setSystemPrompt(fallbackPrompt);
-      }
-    };
-
-    // 先设置基础提示词，避免空白
-    setSystemPrompt(DEFAULT_SYSTEM_PROMPT(''));
-    // 然后异步加载完整版本
-    initializeSystemPrompt();
+    console.log('[AIGenerationPanel] 🔄 初始化System Prompt...');
+    
+    // 直接使用不含图片的系统提示词，避免请求过大
+    const textOnlySystemPrompt = DEFAULT_SYSTEM_PROMPT('');
+    setSystemPrompt(textOnlySystemPrompt);
+    console.log('[AIGenerationPanel] ✅ System Prompt加载成功，长度:', textOnlySystemPrompt.length);
   }, []);
 
   // 一键生成功能
@@ -67,9 +55,11 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       // 第一步：使用已加载的系统提示词分析图像
       console.log('[AIGenerationPanel] 📸 分析画板内容...');
       
-      const analysisResult = await visionService.analyzeImage(
+      const analysisResult = await visionService.analyzeImageWithReference(
         canvasSnapshot,
-        systemPrompt  // 使用已初始化的systemPrompt
+        systemPrompt,  // 纯文本系统提示词
+        REFERENCE_IMAGE_URL,  // 参考图片URL
+        undefined  // 使用后端的默认用户提示词
       );
 
       console.log('[AIGenerationPanel] ✅ 分析完成，生成prompt长度:', analysisResult.analysis.length);

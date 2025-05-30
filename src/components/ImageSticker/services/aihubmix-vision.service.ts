@@ -131,4 +131,85 @@ export class AihubmixVisionService {
       return false;
     }
   }
+
+  /**
+   * 分析画板快照（包含参考图片）
+   * @param canvasImageBase64 画板快照的base64编码
+   * @param systemPrompt 系统提示词（纯文本）
+   * @param referenceImageUrl 参考图片URL
+   * @param userPrompt 用户提示词
+   * @returns 分析结果
+   */
+  async analyzeImageWithReference(
+    canvasImageBase64: string,
+    systemPrompt: string,
+    referenceImageUrl: string,
+    userPrompt?: string
+  ): Promise<{ analysis: string; usage?: any }> {
+    console.log('[AihubmixVisionService analyzeImageWithReference] === 带参考图片的分析开始 ===');
+    
+    try {
+      console.log('[AihubmixVisionService analyzeImageWithReference] 📋 请求参数:');
+      console.log('  - 画板快照大小:', Math.round(canvasImageBase64.length / 1024), 'KB');
+      console.log('  - 系统提示词长度:', systemPrompt.length);
+      console.log('  - 参考图片URL:', referenceImageUrl);
+      console.log('  - 用户提示词长度:', userPrompt?.length || 0);
+      console.log('  - 目标URL:', `${this.baseUrl}/.netlify/functions/aihubmix-vision-analyze`);
+      
+      const requestBody = {
+        image_base64: canvasImageBase64,
+        system_prompt: systemPrompt,  // ai-prompts.ts的系统指令
+        reference_image_url: referenceImageUrl
+      };
+
+      console.log('[AihubmixVisionService analyzeImageWithReference] 🚀 发起网络请求...');
+      const requestStartTime = performance.now();
+      
+      const response = await fetch(`${this.baseUrl}/.netlify/functions/aihubmix-vision-analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const requestEndTime = performance.now();
+      const requestDuration = Math.round(requestEndTime - requestStartTime);
+      
+      console.log('[AihubmixVisionService analyzeImageWithReference] 📊 网络请求完成:');
+      console.log('  - 请求耗时:', requestDuration, 'ms');
+      console.log('  - 响应状态:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[AihubmixVisionService analyzeImageWithReference] ❌ 请求失败:');
+        console.error('  - 状态码:', response.status);
+        console.error('  - 错误信息:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        console.error('[AihubmixVisionService analyzeImageWithReference] ❌ 分析失败:', result.error);
+        throw new Error(result.error || '图像分析失败');
+      }
+
+      console.log('[AihubmixVisionService analyzeImageWithReference] ✅ 分析成功:');
+      console.log('  - 分析结果长度:', result.analysis?.length || 0);
+      console.log('  - 总耗时:', requestDuration, 'ms');
+      console.log('[AihubmixVisionService analyzeImageWithReference] === 带参考图片的分析完成 ===');
+
+      return {
+        analysis: result.analysis,
+        usage: result.usage
+      };
+
+    } catch (error) {
+      console.error('[AihubmixVisionService analyzeImageWithReference] ❌ 分析异常:', error);
+      console.error('  - 错误类型:', error instanceof Error ? error.constructor.name : typeof error);
+      console.error('  - 错误消息:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }
 } 

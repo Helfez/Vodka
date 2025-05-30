@@ -42,6 +42,10 @@ export default async (request, context) => {
         console.log('  - 图片大小:', requestBody.image_base64 ? Math.round(requestBody.image_base64.length / 1024) + 'KB' : 'N/A');
         console.log('  - 系统提示词长度:', requestBody.system_prompt?.length || 0);
         console.log('  - 用户提示词长度:', requestBody.user_prompt?.length || 0);
+        console.log('  - 是否有参考图片:', !!requestBody.reference_image_url);
+        if (requestBody.reference_image_url) {
+            console.log('  - 参考图片URL:', requestBody.reference_image_url);
+        }
     } catch (error) {
         console.error('[aihubmix-vision-analyze] ❌ JSON解析失败:', error.message);
         return new Response(JSON.stringify({ error: '无效的JSON请求体', details: error.message }), {
@@ -52,16 +56,33 @@ export default async (request, context) => {
 
     const { 
         image_base64, 
-        system_prompt = "你是一个专业的图像分析师，请分析用户的画板内容并生成详细的图片描述。",
-        user_prompt = "请分析这个画板的内容，描述其中的元素、布局、颜色和风格，然后生成一个适合用于AI图片生成的详细提示词。"
+        system_prompt,  // 直接使用前端传来的值，不设默认值
+        reference_image_url
     } = requestBody;
 
     if (!image_base64) {
         console.error('[aihubmix-vision-analyze] ❌ 缺少必需参数: image_base64');
-        return new Response(JSON.stringify({ error: '请求体中缺少有效的图像Base64编码 (image_base64)' }), {
+        return new Response(JSON.stringify({ error: '缺少必需参数: image_base64' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
+    }
+
+    if (!system_prompt) {
+        console.error('[aihubmix-vision-analyze] ❌ 缺少必需参数: system_prompt');
+        return new Response(JSON.stringify({ error: '缺少必需参数: system_prompt' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+    }
+
+    console.log('[aihubmix-vision-analyze] 📋 处理参数:');
+    console.log('  - 画板图片大小:', Math.round(image_base64.length / 1024), 'KB');
+    console.log('  - 系统提示词长度:', system_prompt.length);
+    console.log('  - 用户提示词长度:', requestBody.user_prompt?.length || 0);
+    console.log('  - 是否有参考图片:', !!reference_image_url);
+    if (reference_image_url) {
+        console.log('  - 参考图片URL:', reference_image_url);
     }
 
     // 使用AIhubmix的API密钥
@@ -93,6 +114,29 @@ export default async (request, context) => {
         console.log('  - 原始格式检查:', image_base64.startsWith('data:') ? '已包含前缀' : '添加前缀');
         console.log('  - 最终数据大小:', Math.round(imageData.length / 1024), 'KB');
 
+        // 构建用户消息内容
+        const userMessageContent = [
+            {
+                type: "image_url",
+                image_url: {
+                    url: imageData,
+                    detail: "high"
+                }
+            }
+        ];
+
+        // 如果有参考图片，添加到消息中
+        if (reference_image_url) {
+            console.log('[aihubmix-vision-analyze] 📎 添加参考图片到分析请求');
+            userMessageContent.push({
+                type: "image_url",
+                image_url: {
+                    url: reference_image_url,
+                    detail: "low"  // 参考图片用较低精度即可
+                }
+            });
+        }
+
         console.log('[aihubmix-vision-analyze] 🚀 开始调用AIhubmix Vision API...');
         const apiStartTime = Date.now();
         
@@ -105,18 +149,7 @@ export default async (request, context) => {
                 },
                 {
                     role: "user",
-                    content: [
-                        {
-                            type: "text",
-                            text: user_prompt
-                        },
-                        {
-                            type: "image_url",
-                            image_url: {
-                                url: imageData
-                            }
-                        }
-                    ]
+                    content: userMessageContent
                 }
             ],
             max_tokens: 1000,
