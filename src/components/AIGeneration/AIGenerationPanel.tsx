@@ -22,9 +22,6 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
   const [error, setError] = useState<string>('');
   const [analysisPrompt, setAnalysisPrompt] = useState<string>(''); // 存储AI分析返回的生图prompt
   const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT(''));
-  const [generatedPrompt, setGeneratedPrompt] = useState<string>('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
 
   const visionService = AihubmixVisionService.getInstance();
   const dalleService = AihubmixDalleService.getInstance();
@@ -119,12 +116,10 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       console.log('[AIGenerationPanel handleOneClickGenerate] 📸 分析画板内容...');
       const analysisStartTime = performance.now();
       
-      // 生成包含参考图片的systemPrompt
-      const systemPromptWithImage = await getSystemPromptWithImage(REFERENCE_IMAGE_URL);
-      
+      // 使用用户编辑的systemPrompt
       const analysisResult = await visionService.analyzeImage(
         canvasSnapshot,
-        systemPromptWithImage
+        systemPrompt
       );
 
       const analysisEndTime = performance.now();
