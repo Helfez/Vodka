@@ -87,6 +87,25 @@ exports.handler = async (event, context) => {
     console.log('  - 文件大小:', Math.round(cloudinaryUploadResponse.bytes / 1024), 'KB');
     console.log('  - Public ID:', cloudinaryUploadResponse.public_id);
 
+    // 验证上传的图片是否可以访问
+    console.log('[upload-to-cloudinary] 🔍 验证图片可访问性...');
+    try {
+      const verifyResponse = await fetch(cloudinaryUploadResponse.secure_url, { 
+        method: 'HEAD',
+        timeout: 5000 // 5秒超时
+      });
+      
+      if (verifyResponse.ok) {
+        console.log('[upload-to-cloudinary] ✅ 图片验证成功，可以正常访问');
+      } else {
+        console.warn('[upload-to-cloudinary] ⚠️ 图片验证失败:', verifyResponse.status);
+        console.warn('  - 可能需要等待CDN同步完成');
+      }
+    } catch (verifyError) {
+      console.warn('[upload-to-cloudinary] ⚠️ 图片验证异常:', verifyError.message);
+      console.warn('  - 可能是网络问题或CDN同步延迟');
+    }
+
     const result = {
       success: true,
       cloudinaryUrl: cloudinaryUploadResponse.secure_url,

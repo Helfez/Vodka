@@ -34,23 +34,57 @@ export default async (request, context) => {
 
     console.log('[image-proxy] 📸 代理图片:', imageUrl.substring(0, 50) + '...');
     
-    const imageResponse = await fetch(imageUrl);
+    let imageResponse;
+    let lastError;
+    const maxRetries = 3;
     
-    if (!imageResponse.ok) {
-      throw new Error(`获取图片失败: ${imageResponse.status}`);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[image-proxy] 🔄 尝试获取图片 (第${attempt}次)...`);
+        
+        imageResponse = await fetch(imageUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; ImageProxy/1.0)',
+          },
+          timeout: 10000 // 10秒超时
+        });
+        
+        if (imageResponse.ok) {
+          console.log(`[image-proxy] ✅ 第${attempt}次尝试成功`);
+          break;
+        } else {
+          lastError = new Error(`HTTP ${imageResponse.status}: ${imageResponse.statusText}`);
+          console.log(`[image-proxy] ❌ 第${attempt}次尝试失败:`, lastError.message);
+        }
+      } catch (fetchError) {
+        lastError = fetchError;
+        console.log(`[image-proxy] ❌ 第${attempt}次尝试异常:`, fetchError.message);
+      }
+      
+      if (attempt < maxRetries) {
+        const delay = attempt * 1000; // 递增延迟：1s, 2s
+        console.log(`[image-proxy] ⏳ 等待${delay}ms后重试...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    if (!imageResponse || !imageResponse.ok) {
+      throw lastError || new Error('获取图片失败');
     }
 
     const imageBuffer = await imageResponse.arrayBuffer();
     const contentType = imageResponse.headers.get('content-type') || 'image/png';
     
     console.log('[image-proxy] ✅ 图片代理成功, 大小:', Math.round(imageBuffer.byteLength / 1024), 'KB');
+    console.log('[image-proxy] 📊 Content-Type:', contentType);
     
     return new Response(imageBuffer, {
       status: 200,
       headers: {
         ...corsHeaders,
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600'
+        'Cache-Control': 'public, max-age=3600',
+        'X-Proxy-Source': 'netlify-functions'
       }
     });
 

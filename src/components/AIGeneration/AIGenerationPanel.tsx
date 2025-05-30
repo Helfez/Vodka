@@ -163,6 +163,37 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       console.log('  - 图片数量:', generationResult.images.length);
       const processedImages = [];
       
+      // 图片可用性验证函数
+      const verifyImageAvailability = async (imageUrl: string, maxRetries = 3, retryDelay = 1000): Promise<boolean> => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            console.log(`    - 验证图片可用性 (第${attempt}次尝试)...`);
+            
+            const response = await fetch(imageUrl, { 
+              method: 'HEAD',
+              cache: 'no-cache'
+            });
+            
+            if (response.ok) {
+              console.log(`    - ✅ 图片验证成功 (第${attempt}次尝试)`);
+              return true;
+            } else {
+              console.log(`    - ❌ 图片验证失败 (第${attempt}次尝试): ${response.status}`);
+            }
+          } catch (error) {
+            console.log(`    - ❌ 图片验证异常 (第${attempt}次尝试):`, error);
+          }
+          
+          if (attempt < maxRetries) {
+            console.log(`    - ⏳ 等待${retryDelay}ms后重试...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+          }
+        }
+        
+        console.log(`    - ❌ 图片验证最终失败 (${maxRetries}次尝试)`);
+        return false;
+      };
+      
       for (let i = 0; i < generationResult.images.length; i++) {
         const image = generationResult.images[i];
         console.log(`[AIGenerationPanel handleOneClickGenerate] 📤 处理第${i + 1}张图片...`);
@@ -196,14 +227,24 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
               console.log(`  - ✅ 第${i + 1}张图片上传成功!`);
               console.log('  - Cloudinary URL:', uploadResult.cloudinaryUrl);
               
-              // 使用Cloudinary URL替换原始URL
-              processedImages.push({
-                ...image,
-                url: uploadResult.cloudinaryUrl,
-                cloudinaryUrl: uploadResult.cloudinaryUrl,
-                originalUrl: image.url
-              });
-              continue;
+              // 验证图片是否真正可用
+              console.log('  - 🔍 验证图片可用性...');
+              const isImageAvailable = await verifyImageAvailability(uploadResult.cloudinaryUrl);
+              
+              if (isImageAvailable) {
+                console.log(`  - ✅ 第${i + 1}张图片验证成功，可以使用!`);
+                
+                // 使用Cloudinary URL替换原始URL
+                processedImages.push({
+                  ...image,
+                  url: uploadResult.cloudinaryUrl,
+                  cloudinaryUrl: uploadResult.cloudinaryUrl,
+                  originalUrl: image.url
+                });
+                continue;
+              } else {
+                console.error(`  - ❌ 第${i + 1}张图片上传成功但验证失败，使用代理备选`);
+              }
             } else {
               console.error(`  - ❌ 第${i + 1}张图片上传失败:`, uploadResult.error);
             }
@@ -215,7 +256,7 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
           console.error(`  - ❌ 第${i + 1}张图片上传异常:`, uploadError);
         }
         
-        // 如果Cloudinary上传失败，使用图片代理URL作为备选
+        // 如果Cloudinary上传失败或验证失败，使用图片代理URL作为备选
         console.log(`  - ⚠️ 第${i + 1}张图片使用代理URL作为备选方案`);
         const proxyUrl = `${window.location.origin}/.netlify/functions/image-proxy?url=${encodeURIComponent(image.url)}`;
         console.log('  - 代理URL:', proxyUrl);
