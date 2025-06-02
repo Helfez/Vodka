@@ -296,9 +296,10 @@ const Whiteboard = ({
       console.log('[Whiteboard CanvasLifecycle useEffect] Using existing canvas.');
     }
 
-    console.log('[Whiteboard CanvasLifecycle useEffect] Applying properties. DrawingMode:', initialIsDrawingMode, 'BrushSize:', brushSize);
+    console.log('[Whiteboard CanvasLifecycle useEffect] Applying properties. DrawingMode:', initialIsDrawingMode);
     canvasInstance.isDrawingMode = initialIsDrawingMode;
-    canvasInstance.freeDrawingBrush = configureBrush(canvasInstance, brushSize, brushColor);
+    // 初始画笔设置将在单独的Effect中处理，避免依赖问题
+    canvasInstance.freeDrawingBrush = configureBrush(canvasInstance, 5, '#000000'); // 使用默认值
     canvasInstance.renderOnAddRemove = true; 
     canvasInstance.preserveObjectStacking = true;
 
@@ -352,10 +353,15 @@ const Whiteboard = ({
   // 单独的Effect来处理画笔属性更新，避免重新创建画布
   useEffect(() => {
     const canvas = fabricCanvasRef.current;
-    if (canvas && canvas.freeDrawingBrush) {
+    if (canvas) {
       console.log('[Whiteboard BrushUpdate useEffect] Updating brush properties:', { brushSize, brushColor });
-      canvas.freeDrawingBrush.width = brushSize;
-      canvas.freeDrawingBrush.color = brushColor;
+      // 确保画笔存在，如果不存在则创建
+      if (!canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush = configureBrush(canvas, brushSize, brushColor);
+      } else {
+        canvas.freeDrawingBrush.width = brushSize;
+        canvas.freeDrawingBrush.color = brushColor;
+      }
     }
   }, [brushSize, brushColor]);
 
