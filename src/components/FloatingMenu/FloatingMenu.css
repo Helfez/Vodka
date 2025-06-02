@@ -1,71 +1,101 @@
-/* 专业简洁风格浮动菜单 */
+/* 暖色调手账风格浮动菜单 */
 .floating-menu {
   position: fixed;
-  background: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #dee2e6;
+  background: linear-gradient(145deg, #faf7f2 0%, #f1e6d7 100%);
+  border-radius: 12px;
+  border: 2px solid rgba(139, 90, 60, 0.25);
   box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.1),
-    0 2px 4px rgba(0, 0, 0, 0.05);
-  padding: 8px;
+    0 8px 20px rgba(139, 90, 60, 0.15),
+    0 4px 8px rgba(139, 90, 60, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   z-index: 1000;
   backdrop-filter: blur(10px);
-  min-width: 120px;
+  min-width: 130px;
+  position: relative;
+}
+
+/* 纸张质感背景 */
+.floating-menu::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(139, 90, 60, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(212, 165, 116, 0.02) 0%, transparent 50%);
+  border-radius: 12px;
+  pointer-events: none;
 }
 
 .floating-menu button {
-  padding: 10px 16px;
-  border: 1px solid #dee2e6;
-  background: #f8f9fa;
-  border-radius: 6px;
+  padding: 11px 16px;
+  border: 1px solid rgba(139, 90, 60, 0.2);
+  background: linear-gradient(145deg, #f9f5ef 0%, #f1e6d7 100%);
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-weight: 500;
-  color: #495057;
+  color: #8b5a3c;
   font-size: 13px;
-  box-shadow: none;
+  box-shadow: 
+    0 2px 4px rgba(139, 90, 60, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
   text-align: left;
+  position: relative;
+  z-index: 1;
 }
 
 .floating-menu button:hover {
-  background: #e9ecef;
-  border-color: #adb5bd;
-  transform: none;
-  box-shadow: none;
+  background: linear-gradient(145deg, #fefcf8 0%, #f5f1eb 100%);
+  border-color: rgba(139, 90, 60, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 
+    0 4px 8px rgba(139, 90, 60, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .floating-menu button:active {
-  background: #dee2e6;
-  transform: none;
-  box-shadow: none;
+  background: linear-gradient(145deg, #f1e6d7 0%, #ede4d3 100%);
+  transform: translateY(0);
+  box-shadow: 
+    0 2px 4px rgba(139, 90, 60, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .floating-menu .close-button {
   position: absolute;
   top: -8px;
   right: -8px;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border-radius: 50%;
-  background: #dc3545;
-  color: white;
-  border: 2px solid white;
+  background: linear-gradient(145deg, #d4a574 0%, #c49660 100%);
+  color: #654321;
+  border: 2px solid #faf7f2;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
   font-weight: bold;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
+  box-shadow: 
+    0 4px 8px rgba(139, 90, 60, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: all 0.3s ease;
+  z-index: 2;
 }
 
 .floating-menu .close-button:hover {
-  background: #c82333;
-  transform: scale(1.05);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(145deg, #ddb184 0%, #d4a574 100%);
+  transform: scale(1.1);
+  box-shadow: 
+    0 6px 12px rgba(139, 90, 60, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }

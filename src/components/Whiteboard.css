@@ -1,4 +1,4 @@
-/* 专业简洁风格的白板包装器 */
+/* 暖色调手账风格的白板包装器 */
 .whiteboard-wrapper {
   display: flex;
   flex-direction: column;
@@ -9,7 +9,7 @@
   position: relative;
 }
 
-/* 专业工具栏区域 */
+/* 手账工具栏区域 */
 .journal-toolbar-area {
   display: flex;
   justify-content: space-between;
@@ -20,7 +20,7 @@
   margin-bottom: 10px;
 }
 
-/* 现代简洁的控制按钮组 */
+/* 暖色调手账按钮组 */
 .journal-controls {
   display: flex;
   gap: 12px;
@@ -28,39 +28,45 @@
 }
 
 .journal-button {
-  background: linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%);
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
+  background: linear-gradient(145deg, #f5f1eb 0%, #ede4d3 100%);
+  border: 1px solid rgba(139, 90, 60, 0.25);
+  border-radius: 12px;
   padding: 10px 18px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   font-weight: 500;
-  color: #495057;
+  color: #8b5a3c;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 3px 6px rgba(139, 90, 60, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .journal-button:hover {
-  background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
-  border-color: #adb5bd;
+  background: linear-gradient(145deg, #f9f5ef 0%, #f1e6d7 100%);
+  border-color: rgba(139, 90, 60, 0.35);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 
+    0 5px 10px rgba(139, 90, 60, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .journal-button:active {
   transform: translateY(0);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 
+    0 2px 4px rgba(139, 90, 60, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .journal-button.primary {
-  background: linear-gradient(145deg, #007bff 0%, #0056b3 100%);
-  color: white;
-  border-color: #0056b3;
+  background: linear-gradient(145deg, #d4a574 0%, #c49660 100%);
+  color: #654321;
+  border-color: rgba(101, 67, 33, 0.3);
 }
 
 .journal-button.primary:hover {
-  background: linear-gradient(145deg, #0069d9 0%, #0056b3 100%);
+  background: linear-gradient(145deg, #ddb184 0%, #d4a574 100%);
 }
 
 /* 主要内容区域 */
@@ -71,25 +77,53 @@
   position: relative;
 }
 
-/* 现代简洁的画布容器 */
+/* 暖色调手账画布容器 */
 .whiteboard-container {
   position: relative;
   width: 900px;
   height: 650px;
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid #dee2e6;
+  background: linear-gradient(145deg, #fefcf8 0%, #f9f5ef 100%);
+  border-radius: 16px;
+  border: 2px solid rgba(212, 165, 116, 0.3);
   box-shadow: 
-    0 4px 12px rgba(0, 0, 0, 0.05),
-    0 2px 4px rgba(0, 0, 0, 0.02);
+    0 10px 30px rgba(139, 90, 60, 0.15),
+    0 6px 12px rgba(139, 90, 60, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   overflow: hidden;
   flex-shrink: 0;
 }
 
-/* 移除装饰性边框和装订线 */
-.whiteboard-container::before,
+/* 手账纸张边框装饰 */
+.whiteboard-container::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  border: 1px solid rgba(139, 90, 60, 0.15);
+  border-radius: 12px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 手账装订线效果 */
 .whiteboard-container::after {
-  display: none;
+  content: '';
+  position: absolute;
+  left: 45px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(139, 90, 60, 0.15) 0px,
+    rgba(139, 90, 60, 0.15) 25px,
+    transparent 25px,
+    transparent 35px
+  );
+  z-index: 1;
+  pointer-events: none;
 }
 
 /* 画布包装器 */
@@ -97,7 +131,7 @@
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 11px;
+  border-radius: 14px;
   overflow: hidden;
 }
 
@@ -106,48 +140,52 @@
   display: block;
   touch-action: none;
   cursor: crosshair;
-  border-radius: 11px;
-  background: #fafafa; /* 浅灰色背景，更专业 */
+  border-radius: 14px;
+  background: #fefcf8;
 }
 
-/* 专业风格的撤销按钮定位 */
+/* 手账风格的撤销按钮定位 */
 .undo-button-container {
   position: absolute;
-  top: 16px;
-  left: 16px;
+  top: 18px;
+  left: 18px;
   z-index: 10;
 }
 
-/* AI生成按钮样式 - 专业风格 */
+/* AI生成按钮样式 - 手账风格 */
 .ai-generation-trigger {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 18px;
+  right: 18px;
   z-index: 100;
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .ai-generation-btn,
 .log-viewer-button {
-  background: linear-gradient(145deg, #6c757d 0%, #5a6268 100%);
-  color: white;
-  border: 1px solid #5a6268;
-  padding: 10px 16px;
-  border-radius: 6px;
+  background: linear-gradient(145deg, #e8dcc6 0%, #d4c4a8 100%);
+  color: #8b5a3c;
+  border: 1px solid rgba(139, 90, 60, 0.25);
+  padding: 11px 16px;
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 500;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 4px 8px rgba(139, 90, 60, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .ai-generation-btn:hover,
 .log-viewer-button:hover {
-  background: linear-gradient(145deg, #5a6268 0%, #495057 100%);
+  background: linear-gradient(145deg, #ede1cc 0%, #dac8ad 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 
+    0 6px 12px rgba(139, 90, 60, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .ai-generation-btn:disabled {
@@ -158,42 +196,46 @@
 
 /* 关闭侧边栏按钮 */
 .close-sidebar-button {
-  background: linear-gradient(145deg, #6c757d 0%, #5a6268 100%);
-  color: white;
-  border: 1px solid #5a6268;
+  background: linear-gradient(145deg, #d4a574 0%, #c49660 100%);
+  color: #654321;
+  border: 1px solid rgba(101, 67, 33, 0.3);
   padding: 10px 16px;
-  border-radius: 6px;
+  border-radius: 12px;
   font-size: 13px;
   font-weight: 500;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 3px 6px rgba(139, 90, 60, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .close-sidebar-button:hover {
-  background: linear-gradient(145deg, #5a6268 0%, #495057 100%);
+  background: linear-gradient(145deg, #ddb184 0%, #d4a574 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 
+    0 5px 10px rgba(139, 90, 60, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
-/* AI Prompt 侧边栏 - 专业风格 */
+/* AI Prompt 侧边栏 - 手账风格 */
 .ai-prompt-sidebar {
   width: 420px;
-  background: #ffffff;
-  border-left: 1px solid #dee2e6;
-  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.05);
+  background: linear-gradient(145deg, #faf7f2 0%, #f1e6d7 100%);
+  border-left: 2px solid rgba(212, 165, 116, 0.3);
+  box-shadow: -8px 0 24px rgba(139, 90, 60, 0.12);
   display: flex;
   flex-direction: column;
   z-index: 50;
-  border-radius: 12px 0 0 12px;
+  border-radius: 16px 0 0 16px;
   overflow: hidden;
 }
 
 .sidebar-header {
   padding: 20px;
-  background: linear-gradient(145deg, #495057 0%, #343a40 100%);
-  color: white;
+  background: linear-gradient(145deg, #8b5a3c 0%, #654321 100%);
+  color: #faf7f2;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -207,9 +249,9 @@
 }
 
 .sidebar-close-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background: rgba(250, 247, 242, 0.15);
+  border: 1px solid rgba(250, 247, 242, 0.25);
+  color: #faf7f2;
   font-size: 16px;
   width: 32px;
   height: 32px;
@@ -218,12 +260,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   font-weight: bold;
 }
 
 .sidebar-close-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(250, 247, 242, 0.25);
   transform: scale(1.05);
 }
 
@@ -231,88 +273,94 @@
   flex: 1;
   padding: 20px;
   overflow-y: auto;
-  background: #f8f9fa;
+  background: linear-gradient(145deg, #f9f5ef 0%, #f1e6d7 100%);
 }
 
-/* System Prompt 编辑区域 - 专业风格 */
+/* System Prompt 编辑区域 - 手账风格 */
 .system-prompt-section {
   margin-bottom: 20px;
   padding: 16px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #dee2e6;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  background: linear-gradient(145deg, #fefcf8 0%, #f9f5ef 100%);
+  border-radius: 12px;
+  border: 1px solid rgba(139, 90, 60, 0.15);
+  box-shadow: 
+    0 3px 6px rgba(139, 90, 60, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .system-prompt-section h4 {
   margin: 0 0 12px 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #495057;
+  color: #8b5a3c;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .system-prompt-textarea {
   width: 100%;
   padding: 12px;
-  border: 1px solid #ced4da;
-  border-radius: 6px;
+  border: 1px solid rgba(139, 90, 60, 0.2);
+  border-radius: 8px;
   font-size: 13px;
   font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
   resize: vertical;
   min-height: 200px;
   line-height: 1.5;
-  background: #ffffff;
-  transition: all 0.2s ease;
+  background: #fefcf8;
+  transition: all 0.3s ease;
   margin-bottom: 12px;
-  color: #212529;
+  color: #654321;
 }
 
 .system-prompt-textarea:focus {
   outline: none;
-  border-color: #80bdff;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+  border-color: #d4a574;
+  box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.15);
   background: #ffffff;
 }
 
 .analyze-button {
   width: 100%;
-  background: linear-gradient(145deg, #007bff 0%, #0056b3 100%);
-  color: white;
-  border: 1px solid #0056b3;
+  background: linear-gradient(145deg, #d4a574 0%, #c49660 100%);
+  color: #654321;
+  border: 1px solid rgba(101, 67, 33, 0.3);
   padding: 12px 20px;
-  border-radius: 6px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 500;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 3px 6px rgba(139, 90, 60, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .analyze-button:hover {
-  background: linear-gradient(145deg, #0069d9 0%, #0056b3 100%);
+  background: linear-gradient(145deg, #ddb184 0%, #d4a574 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 
+    0 5px 10px rgba(139, 90, 60, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
-/* 专业风格滚动条 */
+/* 手账风格滚动条 */
 .sidebar-content::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .sidebar-content::-webkit-scrollbar-track {
-  background: #f1f3f4;
-  border-radius: 3px;
+  background: rgba(139, 90, 60, 0.1);
+  border-radius: 4px;
 }
 
 .sidebar-content::-webkit-scrollbar-thumb {
-  background: #ced4da;
-  border-radius: 3px;
+  background: rgba(139, 90, 60, 0.3);
+  border-radius: 4px;
 }
 
 .sidebar-content::-webkit-scrollbar-thumb:hover {
-  background: #adb5bd;
+  background: rgba(139, 90, 60, 0.5);
 }
 
 /* 响应式设计 */

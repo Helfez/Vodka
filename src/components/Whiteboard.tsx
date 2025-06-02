@@ -450,57 +450,33 @@ const Whiteboard = ({
       const loadEndTime = performance.now();
       console.log('[Whiteboard handleImageProcessed] ✅ 图片加载完成，耗时:', Math.round(loadEndTime - loadStartTime), 'ms');
       
+      // 计算图片缩放比例，确保图片不会太大
+      const maxSize = 300;
+      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+      
       const imagePosition = {
-        x: clickPosition.x - processedImage.width / 2,
-        y: clickPosition.y - processedImage.height / 2
+        x: clickPosition.x - (img.width * scale) / 2,
+        y: clickPosition.y - (img.height * scale) / 2
       };
       
       const fabricImage = new fabric.Image(img, {
         left: imagePosition.x,
         top: imagePosition.y,
-        selectable: false,
-        hasControls: false,
+        scaleX: scale,
+        scaleY: scale,
+        selectable: true,
+        hasControls: true,
         evented: true
       });
 
+      console.log('[Whiteboard handleImageProcessed] 🖼️ 添加图片到画布...');
       canvas.add(fabricImage);
+      canvas.setActiveObject(fabricImage);
+      canvas.renderAll();
 
-      try {
-        console.log('[Whiteboard handleImageProcessed] ✨ 应用照片效果...');
-        PhotoEffect.applyPhotoEffect(fabricImage, {
-          animation: {
-            initial: { scale: 0.7, opacity: 0, rotation: -20 },
-            final: { scale: 1, opacity: 1, rotation: Math.random() * 6 - 3 },
-            duration: 1200,
-            easing: 'easeOutBack'
-          }
-        });
-
-        fabricImage.set({ selectable: true, hasControls: true, evented: true });
-
-        fabricImage.on('selected', () => {
-          console.log('[Whiteboard handleImageProcessed] 🎯 图片被选中');
-          const bounds = fabricImage.getBoundingRect();
-          setStickerButtonPosition({
-            x: bounds.left + bounds.width / 2,
-            y: bounds.top - 20,
-            target: fabricImage
-          });
-        });
-
-        fabricImage.on('deselected', () => {
-          console.log('[Whiteboard handleImageProcessed] ⭕ 图片取消选中');
-          setStickerButtonPosition(null);
-        });
-
-      } catch (error: any) {
-        console.error('[Whiteboard handleImageProcessed] ❌ 照片效果应用失败:', error);
-      } finally {
-        canvas.renderAll();
-      }
-
+      console.log('[Whiteboard handleImageProcessed] 💾 记录历史状态...');
       requestAnimationFrame(() => {
-        recordState(); // Use existing recordState
+        recordState();
       });
 
       setMenuPosition(null);
@@ -508,8 +484,13 @@ const Whiteboard = ({
       console.log('[Whiteboard handleImageProcessed] === 图片上传处理完成 ===');
     };
 
+    img.onerror = () => {
+      console.error('[Whiteboard handleImageProcessed] ❌ 图片加载失败');
+      alert('图片加载失败，请重试');
+    };
+
     img.src = processedImage.dataUrl;
-  }, [clickPosition, recordState]); // Added recordState
+  }, [clickPosition, recordState]);
 
   return (
     <div className="whiteboard-wrapper">

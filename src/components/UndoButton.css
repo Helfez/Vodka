@@ -1,14 +1,14 @@
-/* 手账风格撤销按钮 */
+/* 暖色调手账风格撤销按钮 */
 .undo-button {
   position: relative;
   width: 50px;
   height: 50px;
-  border: 2px solid rgba(139, 90, 43, 0.2);
+  border: 2px solid rgba(139, 90, 60, 0.25);
   border-radius: 15px;
-  background: linear-gradient(145deg, #f8f5f1 0%, #f0e6d6 100%);
+  background: linear-gradient(145deg, #f9f5ef 0%, #f1e6d7 100%);
   box-shadow: 
-    0 6px 12px rgba(139, 90, 43, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    0 6px 12px rgba(139, 90, 60, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -34,18 +34,18 @@
 }
 
 .undo-button:hover {
-  background: linear-gradient(145deg, #faf8f4 0%, #f5f1eb 100%);
+  background: linear-gradient(145deg, #fefcf8 0%, #f5f1eb 100%);
   transform: translateY(-3px);
   box-shadow: 
-    0 8px 16px rgba(139, 90, 43, 0.2),
+    0 8px 16px rgba(139, 90, 60, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  border-color: rgba(139, 90, 43, 0.3);
+  border-color: rgba(139, 90, 60, 0.35);
 }
 
 .undo-button:active {
   transform: translateY(-1px);
   box-shadow: 
-    0 4px 8px rgba(139, 90, 43, 0.15),
+    0 4px 8px rgba(139, 90, 60, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
@@ -54,9 +54,9 @@
   cursor: not-allowed;
   transform: none;
   box-shadow: 
-    0 2px 4px rgba(139, 90, 43, 0.1),
+    0 2px 4px rgba(139, 90, 60, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
-  background: linear-gradient(145deg, #f0e6d6 0%, #e8dcc6 100%);
+  background: linear-gradient(145deg, #f1e6d7 0%, #ede4d3 100%);
 }
 
 .undo-button:disabled::before {
@@ -66,8 +66,8 @@
 .undo-button svg {
   width: 28px;
   height: 28px;
-  color: #8b5a2b;
-  filter: drop-shadow(0 1px 2px rgba(139, 90, 43, 0.2));
+  color: #8b5a3c;
+  filter: drop-shadow(0 1px 2px rgba(139, 90, 60, 0.2));
   position: relative;
   z-index: 1;
 }
