@@ -79,89 +79,6 @@ const Whiteboard = ({
 
   // --- Callbacks --- 
 
-  // Callback to record the current canvas state for undo history
-  const recordState = useCallback(() => {
-    const currentCanvas = fabricCanvasRef.current;
-    if (!currentCanvas) {
-      console.warn('[Whiteboard recordState] Canvas ref is null, cannot record state.');
-      return;
-    }
-    console.log('[Whiteboard recordState] Recording state. Objects:', currentCanvas.getObjects().length);
-    const currentState: DrawingState = {
-      canvasState: JSON.stringify(currentCanvas.toJSON()),
-      timestamp: Date.now()
-    };
-    setHistory(prev => {
-      const newHistory = [...prev, currentState].slice(-20); 
-      return newHistory;
-    });
-  }, [fabricCanvasRef, setHistory]);
-
-  // Callback to handle the undo action
-  const handleUndo = useCallback(() => {
-    const currentCanvas = fabricCanvasRef.current;
-    if (!currentCanvas) {
-      console.warn('[Whiteboard handleUndo] Canvas ref is null, cannot undo.');
-      return;
-    }
-
-    setHistory(prevHistory => {
-      console.log('[Whiteboard handleUndo] Attempting undo. History length:', prevHistory.length);
-      if (prevHistory.length <= 1) { 
-        console.log('[Whiteboard handleUndo] No more states to undo or only initial state left.');
-        return prevHistory; 
-      }
-
-      try {
-        const prevState = prevHistory[prevHistory.length - 2]; 
-        console.log('[Whiteboard handleUndo] Reverting to state from timestamp:', prevState.timestamp);
-        currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
-          console.log('[Whiteboard handleUndo] 🖌️ 恢复画布绘图状态...');
-          currentCanvas.isDrawingMode = initialIsDrawingMode; 
-          currentCanvas.freeDrawingBrush = configureBrush(currentCanvas, brushSize, brushColor);
-          currentCanvas.renderAll();
-          console.log('[Whiteboard handleUndo] ✅ Canvas loaded from previous state with drawing mode restored.');
-        });
-        return prevHistory.slice(0, -1); 
-      } catch (error) {
-        console.error('[Whiteboard handleUndo] Failed to undo:', error);
-        return prevHistory; 
-      }
-    });
-  }, [setHistory, fabricCanvasRef, brushSize, brushColor, initialIsDrawingMode, configureBrush]);
-
-  // Helper to get canvas snapshot
-  const getCanvasSnapshotDataURL = useCallback((): string | null => {
-    console.log('[Whiteboard getCanvasSnapshotDataURL] Attempting to get canvas snapshot.');
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) {
-      console.error('[Whiteboard getCanvasSnapshotDataURL] ❌ Canvas is not available.');
-      return null;
-    }
-    try {
-      const dataURL = canvas.toDataURL({
-        format: 'png',
-        quality: 0.8,
-        multiplier: 1,
-      });
-      console.log('[Whiteboard getCanvasSnapshotDataURL] ✅ Snapshot generated successfully.');
-      // Auto-download PNG
-      const link = document.createElement('a');
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      link.href = dataURL;
-      link.download = `whiteboard-snapshot-${timestamp}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      console.log('[Whiteboard getCanvasSnapshotDataURL] 💾 Snapshot auto-downloaded.');
-      setCanvasSnapshot(dataURL); // Keep updating this state if other parts still use it
-      return dataURL;
-    } catch (error) {
-      console.error('[Whiteboard getCanvasSnapshotDataURL] ❌ Failed to generate snapshot:', error);
-      return null;
-    }
-  }, [fabricCanvasRef]); // Removed setCanvasSnapshot from deps as it's directly in function
-
   // 处理AI生成的图片
   const handleAIImageGenerated = useCallback((imageUrl: string) => {
     console.log('[Whiteboard handleAIImageGenerated] === AI图片集成开始 ===');
@@ -810,7 +727,43 @@ const Whiteboard = ({
         >
           <UndoButton 
             canUndo={history.length > 1}
-            onUndo={handleUndo}
+            onUndo={() => {
+              const currentCanvas = fabricCanvasRef.current;
+              if (!currentCanvas) {
+                console.warn('[Whiteboard handleUndo] Canvas ref is null, cannot undo.');
+                return;
+              }
+
+              setHistory(prevHistory => {
+                console.log('[Whiteboard handleUndo] Attempting undo. History length:', prevHistory.length);
+                if (prevHistory.length <= 1) { 
+                  console.log('[Whiteboard handleUndo] No more states to undo or only initial state left.');
+                  return prevHistory; 
+                }
+
+                try {
+                  const prevState = prevHistory[prevHistory.length - 2]; 
+                  console.log('[Whiteboard handleUndo] Reverting to state from timestamp:', prevState.timestamp);
+                  currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
+                    console.log('[Whiteboard handleUndo] 🖌️ 恢复画布绘图状态...');
+                    currentCanvas.isDrawingMode = initialIsDrawingMode; 
+                    // 恢复画笔设置
+                    const brush = new fabric.PencilBrush(currentCanvas);
+                    brush.width = brushSize;
+                    brush.color = brushColor;
+                    (brush as any).decimate = 8;
+                    (brush as any).controlPointsNum = 2;
+                    currentCanvas.freeDrawingBrush = brush;
+                    currentCanvas.renderAll();
+                    console.log('[Whiteboard handleUndo] ✅ Canvas loaded from previous state with drawing mode restored.');
+                  });
+                  return prevHistory.slice(0, -1); 
+                } catch (error) {
+                  console.error('[Whiteboard handleUndo] Failed to undo:', error);
+                  return prevHistory; 
+                }
+              });
+            }}
           />
           <div className="canvas-wrapper">
             <canvas ref={canvasElRef} />
