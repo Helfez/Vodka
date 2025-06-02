@@ -47,7 +47,6 @@ const Whiteboard = ({
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [clickPosition, setClickPosition] = useState<{ x: number; y: number } | null>(null);
   const [brushSize, setBrushSize] = useState(5);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [brushColor, setBrushColor] = useState('#000000');
   const [history, setHistory] = useState<DrawingState[]>([]);
   
@@ -63,6 +62,69 @@ const Whiteboard = ({
 
   // State for log viewer
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
+
+  // --- Helper Functions ---
+  
+  // 统一的画笔创建函数，避免重复代码
+  const createBrush = useCallback((canvas: FabricCanvas, width: number = 5, color: string = '#000000') => {
+    const brush = new fabric.PencilBrush(canvas);
+    brush.width = width;
+    brush.color = color;
+    (brush as any).decimate = 8;
+    (brush as any).controlPointsNum = 2;
+    return brush;
+  }, []);
+
+  // 统一的历史记录函数，避免重复代码
+  const recordCanvasState = useCallback(() => {
+    const currentCanvas = fabricCanvasRef.current;
+    if (!currentCanvas) {
+      console.warn('[Whiteboard recordCanvasState] Canvas ref is null, cannot record state.');
+      return;
+    }
+    console.log('[Whiteboard recordCanvasState] Recording state. Objects:', currentCanvas.getObjects().length);
+    const currentState: DrawingState = {
+      canvasState: JSON.stringify(currentCanvas.toJSON()),
+      timestamp: Date.now()
+    };
+    setHistory(prev => {
+      const newHistory = [...prev, currentState].slice(-20); 
+      return newHistory;
+    });
+  }, []);
+
+  // 统一的快照生成和下载函数，避免重复代码
+  const generateCanvasSnapshot = useCallback(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) {
+      console.error('[Whiteboard generateCanvasSnapshot] ❌ Canvas is not available.');
+      return null;
+    }
+    try {
+      const dataURL = canvas.toDataURL({
+        format: 'png',
+        quality: 0.8,
+        multiplier: 1,
+      });
+      console.log('[Whiteboard generateCanvasSnapshot] ✅ Snapshot generated successfully.');
+      
+      // Auto-download PNG
+      const link = document.createElement('a');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      link.href = dataURL;
+      link.download = `whiteboard-snapshot-${timestamp}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      console.log('[Whiteboard generateCanvasSnapshot] 💾 Snapshot auto-downloaded.');
+      
+      return dataURL;
+    } catch (error) {
+      console.error('[Whiteboard generateCanvasSnapshot] ❌ Failed to generate snapshot:', error);
+      alert('无法获取画板快照，请重试');
+      return null;
+    }
+  }, []);
 
   // --- Callbacks --- 
 
@@ -110,12 +172,7 @@ const Whiteboard = ({
         // 恢复画布绘图状态
         canvas.isDrawingMode = currentDrawingMode;
         if (!currentBrush) {
-          const brush = new fabric.PencilBrush(canvas);
-          brush.width = canvas.freeDrawingBrush?.width || 5;
-          brush.color = canvas.freeDrawingBrush?.color || '#000000';
-          (brush as any).decimate = 8;
-          (brush as any).controlPointsNum = 2;
-          canvas.freeDrawingBrush = brush;
+          canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
         } else {
           canvas.freeDrawingBrush = currentBrush;
         }
@@ -123,18 +180,7 @@ const Whiteboard = ({
 
         requestAnimationFrame(() => {
           // 记录历史状态
-          const currentCanvas = fabricCanvasRef.current;
-          if (!currentCanvas) {
-            return;
-          }
-          const currentState: DrawingState = {
-            canvasState: JSON.stringify(currentCanvas.toJSON()),
-            timestamp: Date.now()
-          };
-          setHistory(prev => {
-            const newHistory = [...prev, currentState].slice(-20); 
-            return newHistory;
-          });
+          recordCanvasState();
         });
 
         console.log('[Whiteboard] AI图片集成完成');
@@ -143,12 +189,7 @@ const Whiteboard = ({
         // 恢复画布状态
         canvas.isDrawingMode = currentDrawingMode;
         if (!currentBrush) {
-          const brush = new fabric.PencilBrush(canvas);
-          brush.width = canvas.freeDrawingBrush?.width || 5;
-          brush.color = canvas.freeDrawingBrush?.color || '#000000';
-          (brush as any).decimate = 8;
-          (brush as any).controlPointsNum = 2;
-          canvas.freeDrawingBrush = brush;
+          canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
         } else {
           canvas.freeDrawingBrush = currentBrush;
         }
@@ -161,19 +202,14 @@ const Whiteboard = ({
       // 恢复画布状态
       canvas.isDrawingMode = currentDrawingMode;
       if (!currentBrush) {
-        const brush = new fabric.PencilBrush(canvas);
-        brush.width = canvas.freeDrawingBrush?.width || 5;
-        brush.color = canvas.freeDrawingBrush?.color || '#000000';
-        (brush as any).decimate = 8;
-        (brush as any).controlPointsNum = 2;
-        canvas.freeDrawingBrush = brush;
+        canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
       } else {
         canvas.freeDrawingBrush = currentBrush;
       }
     };
 
     img.src = imageUrl;
-  }, [clickPosition]);
+  }, [clickPosition, brushSize, brushColor]);
 
   // --- Effects --- 
 
@@ -208,13 +244,8 @@ const Whiteboard = ({
 
     console.log('[Whiteboard CanvasLifecycle useEffect] Applying properties. DrawingMode:', initialIsDrawingMode);
     canvasInstance.isDrawingMode = initialIsDrawingMode;
-    // 初始画笔设置 - 使用内联创建避免依赖问题
-    const initialBrush = new fabric.PencilBrush(canvasInstance);
-    initialBrush.width = 5;
-    initialBrush.color = '#000000';
-    (initialBrush as any).decimate = 8;
-    (initialBrush as any).controlPointsNum = 2;
-    canvasInstance.freeDrawingBrush = initialBrush;
+    // 初始画笔设置 - 使用统一的createBrush函数
+    canvasInstance.freeDrawingBrush = createBrush(canvasInstance, brushSize, brushColor);
     canvasInstance.renderOnAddRemove = true; 
     canvasInstance.preserveObjectStacking = true;
 
@@ -273,15 +304,10 @@ const Whiteboard = ({
             currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
               console.log('[Whiteboard handleUndo] 🖌️ 恢复画布绘图状态...');
               currentCanvas.isDrawingMode = initialIsDrawingMode; 
-              // 恢复画笔设置 - 使用当前的画笔设置而不是内部变量
-              const currentBrushSize = currentCanvas.freeDrawingBrush?.width || 5;
-              const currentBrushColor = currentCanvas.freeDrawingBrush?.color || '#000000';
-              const brush = new fabric.PencilBrush(currentCanvas);
-              brush.width = currentBrushSize;
-              brush.color = currentBrushColor;
-              (brush as any).decimate = 8;
-              (brush as any).controlPointsNum = 2;
-              currentCanvas.freeDrawingBrush = brush;
+              // 恢复画笔设置 - 使用统一的createBrush函数
+              const currentBrushSize = currentCanvas.freeDrawingBrush?.width || brushSize;
+              const currentBrushColor = currentCanvas.freeDrawingBrush?.color || brushColor;
+              currentCanvas.freeDrawingBrush = createBrush(currentCanvas, currentBrushSize, currentBrushColor);
               currentCanvas.renderAll();
               console.log('[Whiteboard handleUndo] ✅ Canvas loaded from previous state with drawing mode restored.');
             });
@@ -345,27 +371,22 @@ const Whiteboard = ({
         canvasInstance.off('mouse:up', handleMouseUpLocal);
       }
     };
-  }, [width, height, initialIsDrawingMode]); // 移除brushSize和brushColor依赖，避免画布频繁重创
+  }, [width, height, initialIsDrawingMode, createBrush, brushSize, brushColor]);
 
   // 单独的Effect来处理画笔属性更新，避免重新创建画布
   useEffect(() => {
     const canvas = fabricCanvasRef.current;
     if (canvas) {
       console.log('[Whiteboard BrushUpdate useEffect] Updating brush properties:', { brushSize, brushColor });
-      // 确保画笔存在，如果不存在则创建 - 内联创建避免依赖问题
+      // 更新现有画笔属性，如果不存在则创建新画笔
       if (!canvas.freeDrawingBrush) {
-        const brush = new fabric.PencilBrush(canvas);
-        brush.width = brushSize;
-        brush.color = brushColor;
-        (brush as any).decimate = 8;
-        (brush as any).controlPointsNum = 2;
-        canvas.freeDrawingBrush = brush;
+        canvas.freeDrawingBrush = createBrush(canvas, brushSize, brushColor);
       } else {
         canvas.freeDrawingBrush.width = brushSize;
         canvas.freeDrawingBrush.color = brushColor;
       }
     }
-  }, [brushSize, brushColor]); // 移除configureBrush依赖
+  }, [brushSize, brushColor, createBrush]);
 
   // Effect for setting the initial history
   useEffect(() => {
@@ -583,12 +604,7 @@ const Whiteboard = ({
           // 恢复画布绘图状态
           canvas.isDrawingMode = currentDrawingMode;
           if (!currentBrush) {
-            const defaultBrush = new fabric.PencilBrush(canvas);
-            defaultBrush.width = 5;
-            defaultBrush.color = '#000000';
-            (defaultBrush as any).decimate = 8;
-            (defaultBrush as any).controlPointsNum = 2;
-            canvas.freeDrawingBrush = defaultBrush;
+            canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
           } else {
             canvas.freeDrawingBrush = currentBrush;
           }
@@ -617,12 +633,7 @@ const Whiteboard = ({
         // 恢复画笔状态
         canvas.isDrawingMode = currentDrawingMode;
         if (!currentBrush) {
-          const defaultBrush = new fabric.PencilBrush(canvas);
-          defaultBrush.width = 5;
-          defaultBrush.color = '#000000';
-          (defaultBrush as any).decimate = 8;
-          (defaultBrush as any).controlPointsNum = 2;
-          canvas.freeDrawingBrush = defaultBrush;
+          canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
         } else {
           canvas.freeDrawingBrush = currentBrush;
         }
@@ -651,12 +662,7 @@ const Whiteboard = ({
       // 恢复画布状态
       canvas.isDrawingMode = currentDrawingMode;
       if (!currentBrush) {
-        const defaultBrush = new fabric.PencilBrush(canvas);
-        defaultBrush.width = 5;
-        defaultBrush.color = '#000000';
-        (defaultBrush as any).decimate = 8;
-        (defaultBrush as any).controlPointsNum = 2;
-        canvas.freeDrawingBrush = defaultBrush;
+        canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
       } else {
         canvas.freeDrawingBrush = currentBrush;
       }
@@ -756,15 +762,10 @@ const Whiteboard = ({
                   currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
                     console.log('[Whiteboard handleUndo] 🖌️ 恢复画布绘图状态...');
                     currentCanvas.isDrawingMode = initialIsDrawingMode; 
-                    // 恢复画笔设置 - 使用当前的画笔设置而不是内部变量
-                    const currentBrushSize = currentCanvas.freeDrawingBrush?.width || 5;
-                    const currentBrushColor = currentCanvas.freeDrawingBrush?.color || '#000000';
-                    const brush = new fabric.PencilBrush(currentCanvas);
-                    brush.width = currentBrushSize;
-                    brush.color = currentBrushColor;
-                    (brush as any).decimate = 8;
-                    (brush as any).controlPointsNum = 2;
-                    currentCanvas.freeDrawingBrush = brush;
+                    // 恢复画笔设置 - 使用统一的createBrush函数
+                    const currentBrushSize = currentCanvas.freeDrawingBrush?.width || brushSize;
+                    const currentBrushColor = currentCanvas.freeDrawingBrush?.color || brushColor;
+                    currentCanvas.freeDrawingBrush = createBrush(currentCanvas, currentBrushSize, currentBrushColor);
                     currentCanvas.renderAll();
                     console.log('[Whiteboard handleUndo] ✅ Canvas loaded from previous state with drawing mode restored.');
                   });
