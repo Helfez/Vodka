@@ -380,7 +380,7 @@ const Whiteboard = ({
       setHistory([initialState]); 
       console.log('[Whiteboard InitialHistory useEffect] Initial history state set.');
     }
-  }, [fabricCanvasRef, history.length]); 
+  }, [history.length]); // 移除fabricCanvasRef依赖，避免死循环
 
   // Effect for component unmount
   useEffect(() => {
@@ -554,6 +554,9 @@ const Whiteboard = ({
       try {
         console.log('[Whiteboard handleImageProcessed] ✨ 应用拍立得照片效果...');
         
+        // 设置canvas引用，PhotoEffect需要它
+        fabricImage.canvas = canvas;
+        
         // 注意：PhotoEffect.applyPhotoEffect会自动添加图片到画布，所以我们不需要单独添加
         PhotoEffect.applyPhotoEffect(fabricImage, {
           animation: {
@@ -657,7 +660,7 @@ const Whiteboard = ({
     };
 
     img.src = processedImage.dataUrl;
-  }, [clickPosition, setStickerButtonPosition, brushSize, brushColor, configureBrush]); // 移除recordState依赖
+  }, [clickPosition, setStickerButtonPosition]); // 移除brushSize、brushColor、configureBrush依赖，避免频繁重新创建
 
   return (
     <div className="whiteboard-wrapper">
