@@ -269,7 +269,7 @@ const Whiteboard = ({
 
   // Effect for initializing and managing the Fabric canvas instance
   useEffect(() => {
-    console.log('[Whiteboard CanvasLifecycle useEffect] Running. Deps:', { width, height, initialIsDrawingMode, brushSize, brushColor });
+    console.log('[Whiteboard CanvasLifecycle useEffect] Running. Deps:', { width, height, initialIsDrawingMode });
 
     if (!canvasElRef.current) {
       console.warn('[Whiteboard CanvasLifecycle useEffect] canvasElRef is null. Bailing out.');
