@@ -392,17 +392,6 @@ const Whiteboard = ({
     }
   }, [brushSize, brushColor]);
 
-  // Effect for setting the initial history
-  useEffect(() => {
-    if (fabricCanvasRef.current && history.length === 0) {
-      const initialState: DrawingState = {
-        canvasState: JSON.stringify(fabricCanvasRef.current.toJSON()), 
-        timestamp: Date.now()
-      };
-      setHistory([initialState]); 
-    }
-  }, [history.length]);
-
   // Effect for component unmount
   useEffect(() => {
     return () => {
