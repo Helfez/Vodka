@@ -357,15 +357,23 @@ const Whiteboard = ({
 
   // Handler for context menu (right-click)
   const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    console.log('[Whiteboard handleContextMenu] Context menu event triggered at:', event.clientX, event.clientY);
+    console.log('[Whiteboard handleContextMenu] === 右键菜单事件触发 ===');
+    console.log('[Whiteboard handleContextMenu] 鼠标位置:', event.clientX, event.clientY);
     event.preventDefault();
+    event.stopPropagation();
     
-    if (!fabricCanvasRef.current) return;
+    if (!fabricCanvasRef.current) {
+      console.warn('[Whiteboard handleContextMenu] ❌ Canvas不可用');
+      return;
+    }
+    
     const canvas = fabricCanvasRef.current;
     
     const rect = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
+    
+    console.log('[Whiteboard handleContextMenu] 画布内相对位置:', x, y);
     
     const pointer = canvas.getPointer(event.nativeEvent);
     const objects = canvas.getObjects();
@@ -375,6 +383,7 @@ const Whiteboard = ({
     ) as fabric.Image | undefined;
 
     if (clickedImage) {
+      console.log('[Whiteboard handleContextMenu] 🖼️ 点击到图片，显示贴纸按钮');
       const bounds = clickedImage.getBoundingRect();
       
       const existingSelection = objects.find(obj => 
@@ -407,6 +416,7 @@ const Whiteboard = ({
         target: clickedImage
       });
     } else {
+      console.log('[Whiteboard handleContextMenu] 📋 点击空白区域，显示上传菜单');
       const existingSelection = objects.find(obj => 
         obj instanceof fabric.Rect && 
         (obj as any).data?.type === 'selection-rect'
@@ -416,10 +426,15 @@ const Whiteboard = ({
         canvas.renderAll();
       }
 
+      console.log('[Whiteboard handleContextMenu] 设置菜单位置:', { x: event.clientX, y: event.clientY });
+      console.log('[Whiteboard handleContextMenu] 设置点击位置:', { x, y });
+      
       setMenuPosition({ x: event.clientX, y: event.clientY });
       setClickPosition({ x, y });
       setStickerButtonPosition(null);
     }
+    
+    console.log('[Whiteboard handleContextMenu] === 右键菜单事件处理完成 ===');
   }, []);
 
   // 处理贴纸转换
@@ -472,6 +487,10 @@ const Whiteboard = ({
       try {
         console.log('[Whiteboard handleImageProcessed] ✨ 应用拍立得照片效果...');
         
+        // 保存当前画布状态
+        const currentDrawingMode = canvas.isDrawingMode;
+        const currentBrush = canvas.freeDrawingBrush;
+        
         // 使用PhotoEffect创建拍立得效果
         PhotoEffect.applyPhotoEffect(fabricImage, {
           animation: {
@@ -481,6 +500,10 @@ const Whiteboard = ({
             easing: 'easeOutBack'
           }
         });
+
+        // 恢复画布绘图状态
+        canvas.isDrawingMode = currentDrawingMode;
+        canvas.freeDrawingBrush = currentBrush;
 
         // 动画完成后设置为可交互
         setTimeout(() => {
@@ -506,6 +529,9 @@ const Whiteboard = ({
             setStickerButtonPosition(null);
           });
           
+          // 再次确保画布状态正确
+          canvas.isDrawingMode = currentDrawingMode;
+          canvas.freeDrawingBrush = currentBrush;
           canvas.renderAll();
         }, 1400);
 
@@ -514,6 +540,10 @@ const Whiteboard = ({
         // fallback: 简单添加图片
         canvas.add(fabricImage);
         fabricImage.set({ selectable: true, hasControls: true, evented: true });
+        
+        // 确保画笔状态正确
+        canvas.isDrawingMode = initialIsDrawingMode;
+        canvas.freeDrawingBrush = configureBrush(canvas, brushSize, brushColor);
         canvas.renderAll();
       }
 
@@ -534,7 +564,7 @@ const Whiteboard = ({
     };
 
     img.src = processedImage.dataUrl;
-  }, [clickPosition, recordState, setStickerButtonPosition]);
+  }, [clickPosition, recordState, setStickerButtonPosition, initialIsDrawingMode, brushSize, brushColor]);
 
   return (
     <div className="whiteboard-wrapper">
