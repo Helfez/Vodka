@@ -6,7 +6,6 @@ import UndoButton from './UndoButton';
 import FloatingMenu from './FloatingMenu/FloatingMenu';
 import ImageUploader from './ImageUpload/ImageUploader';
 import { ProcessedImage } from './ImageUpload/ImageProcessor';
-import { PhotoEffect } from './ImageUpload/PhotoEffect/PhotoEffect';
 import { FloatingButton } from './ImageSticker/components/FloatingButton';
 import { FloatingButtonPosition } from './ImageSticker/services/types';
 import { LogViewer } from './LogViewer/LogViewer';
