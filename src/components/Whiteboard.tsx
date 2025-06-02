@@ -6,6 +6,7 @@ import UndoButton from './UndoButton';
 import FloatingMenu from './FloatingMenu/FloatingMenu';
 import ImageUploader from './ImageUpload/ImageUploader';
 import { ProcessedImage } from './ImageUpload/ImageProcessor';
+import { PhotoEffect } from './ImageUpload/PhotoEffect/PhotoEffect';
 import { FloatingButton } from './ImageSticker/components/FloatingButton';
 import { FloatingButtonPosition } from './ImageSticker/services/types';
 import { LogViewer } from './LogViewer/LogViewer';
@@ -450,7 +451,7 @@ const Whiteboard = ({
       console.log('[Whiteboard handleImageProcessed] ✅ 图片加载完成，耗时:', Math.round(loadEndTime - loadStartTime), 'ms');
       
       // 计算图片缩放比例，确保图片不会太大
-      const maxSize = 300;
+      const maxSize = 250;
       const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
       
       const imagePosition = {
@@ -463,20 +464,64 @@ const Whiteboard = ({
         top: imagePosition.y,
         scaleX: scale,
         scaleY: scale,
-        selectable: true,
-        hasControls: true,
-        evented: true
+        selectable: false,  // PhotoEffect会处理可选择性
+        hasControls: false, // PhotoEffect会处理控制点
+        evented: false      // PhotoEffect会处理事件
       });
 
-      console.log('[Whiteboard handleImageProcessed] 🖼️ 添加图片到画布...');
-      canvas.add(fabricImage);
-      canvas.setActiveObject(fabricImage);
-      canvas.renderAll();
+      try {
+        console.log('[Whiteboard handleImageProcessed] ✨ 应用拍立得照片效果...');
+        
+        // 使用PhotoEffect创建拍立得效果
+        PhotoEffect.applyPhotoEffect(fabricImage, {
+          animation: {
+            initial: { scale: 0.7, opacity: 0, rotation: -15 },
+            final: { scale: 1, opacity: 1, rotation: PhotoEffect.getRandomRotation() },
+            duration: 1400,
+            easing: 'easeOutBack'
+          }
+        });
+
+        // 动画完成后设置为可交互
+        setTimeout(() => {
+          fabricImage.set({ 
+            selectable: true, 
+            hasControls: true, 
+            evented: true 
+          });
+          
+          // 添加选中事件监听
+          fabricImage.on('selected', () => {
+            console.log('[Whiteboard handleImageProcessed] 🎯 图片被选中');
+            const bounds = fabricImage.getBoundingRect();
+            setStickerButtonPosition({
+              x: bounds.left + bounds.width / 2,
+              y: bounds.top - 20,
+              target: fabricImage
+            });
+          });
+
+          fabricImage.on('deselected', () => {
+            console.log('[Whiteboard handleImageProcessed] ⭕ 图片取消选中');
+            setStickerButtonPosition(null);
+          });
+          
+          canvas.renderAll();
+        }, 1400);
+
+      } catch (error: any) {
+        console.error('[Whiteboard handleImageProcessed] ❌ 照片效果应用失败:', error);
+        // fallback: 简单添加图片
+        canvas.add(fabricImage);
+        fabricImage.set({ selectable: true, hasControls: true, evented: true });
+        canvas.renderAll();
+      }
 
       console.log('[Whiteboard handleImageProcessed] 💾 记录历史状态...');
-      requestAnimationFrame(() => {
+      // 延迟记录状态，等动画完成
+      setTimeout(() => {
         recordState();
-      });
+      }, 1500);
 
       setMenuPosition(null);
       setClickPosition(null);
@@ -489,7 +534,7 @@ const Whiteboard = ({
     };
 
     img.src = processedImage.dataUrl;
-  }, [clickPosition, recordState]);
+  }, [clickPosition, recordState, setStickerButtonPosition]);
 
   return (
     <div className="whiteboard-wrapper">

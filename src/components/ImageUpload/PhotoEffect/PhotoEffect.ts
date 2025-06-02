@@ -6,30 +6,30 @@ export class PhotoEffect {
   private static readonly DEFAULT_OPTIONS: PhotoEffectOptions = {
     style: {
       border: {
-        width: 12,
-        color: '#ffffff'
+        width: 14,
+        color: '#faf7f2'  // 暖米白色边框
       },
       shadow: {
-        blur: 15,
-        spread: 8,
-        color: 'rgba(0,0,0,0.25)'
+        blur: 18,
+        spread: 6,
+        color: 'rgba(139, 90, 60, 0.2)'  // 暖棕色阴影
       },
       background: {
-        color: '#fdfbf7'
+        color: '#fefcf8'  // 温暖的米白色背景
       }
     },
     animation: {
       initial: {
-        scale: 0.7,
+        scale: 0.6,
         opacity: 0,
-        rotation: -20
+        rotation: -25
       },
       final: {
         scale: 1,
         opacity: 1,
         rotation: 0
       },
-      duration: 1200,
+      duration: 1400,
       easing: 'easeOutBack'
     }
   };
