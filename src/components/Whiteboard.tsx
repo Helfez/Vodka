@@ -162,20 +162,6 @@ const Whiteboard = ({
     }
   }, [fabricCanvasRef]); // Removed setCanvasSnapshot from deps as it's directly in function
 
-  // New: "生图" button's main handler - 改为打开AIGenerationPanel
-  const handleDirectImageGeneration = useCallback(async () => {
-    console.log('[Whiteboard handleDirectImageGeneration] === Opening AI Generation Panel ===');
-    
-    // 获取画布快照
-    const snapshot = getCanvasSnapshotDataURL();
-    if (snapshot) {
-      setCanvasSnapshot(snapshot);
-      setIsAIGenerationOpen(true);
-    } else {
-      alert('无法获取画板快照，请重试');
-    }
-  }, [getCanvasSnapshotDataURL]);
-
   // 处理AI生成的图片
   const handleAIImageGenerated = useCallback((imageUrl: string) => {
     console.log('[Whiteboard handleAIImageGenerated] === AI图片集成开始 ===');
@@ -242,7 +228,21 @@ const Whiteboard = ({
 
         console.log('[Whiteboard handleAIImageGenerated] 💾 记录历史状态...');
         requestAnimationFrame(() => {
-          recordState();
+          // 内联recordState逻辑，避免函数依赖
+          const currentCanvas = fabricCanvasRef.current;
+          if (!currentCanvas) {
+            console.warn('[Whiteboard handleAIImageGenerated recordState] Canvas ref is null, cannot record state.');
+            return;
+          }
+          console.log('[Whiteboard handleAIImageGenerated recordState] Recording state. Objects:', currentCanvas.getObjects().length);
+          const currentState: DrawingState = {
+            canvasState: JSON.stringify(currentCanvas.toJSON()),
+            timestamp: Date.now()
+          };
+          setHistory(prev => {
+            const newHistory = [...prev, currentState].slice(-20); 
+            return newHistory;
+          });
         });
 
         console.log('[Whiteboard handleAIImageGenerated] ✅ AI图片集成完成');
@@ -263,7 +263,7 @@ const Whiteboard = ({
     };
 
     img.src = imageUrl;
-  }, [clickPosition, recordState, brushSize, brushColor, configureBrush]);
+  }, [clickPosition, brushSize, brushColor, configureBrush]); // 移除recordState依赖
 
   // --- Effects --- 
 
@@ -317,7 +317,23 @@ const Whiteboard = ({
 
     const handlePathCreatedLocal = (e: fabric.TEvent & { path: fabric.Path }) => { 
       console.log('[Whiteboard path:created] Path created:', e.path);
-      requestAnimationFrame(recordState); 
+      // 使用内联函数避免依赖recordState导致useEffect频繁重新执行
+      requestAnimationFrame(() => {
+        const currentCanvas = fabricCanvasRef.current;
+        if (!currentCanvas) {
+          console.warn('[Whiteboard path:created recordState] Canvas ref is null, cannot record state.');
+          return;
+        }
+        console.log('[Whiteboard path:created recordState] Recording state. Objects:', currentCanvas.getObjects().length);
+        const currentState: DrawingState = {
+          canvasState: JSON.stringify(currentCanvas.toJSON()),
+          timestamp: Date.now()
+        };
+        setHistory(prev => {
+          const newHistory = [...prev, currentState].slice(-20); 
+          return newHistory;
+        });
+      });
     };
 
     const handleMouseUpLocal = (e: fabric.TEvent) => { 
@@ -327,13 +343,77 @@ const Whiteboard = ({
     const handleKeyboardLocal = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 'z') {
         e.preventDefault(); 
-        handleUndo(); 
+        // 使用内联函数调用undo逻辑
+        const currentCanvas = fabricCanvasRef.current;
+        if (!currentCanvas) {
+          console.warn('[Whiteboard handleUndo] Canvas ref is null, cannot undo.');
+          return;
+        }
+
+        setHistory(prevHistory => {
+          console.log('[Whiteboard handleUndo] Attempting undo. History length:', prevHistory.length);
+          if (prevHistory.length <= 1) { 
+            console.log('[Whiteboard handleUndo] No more states to undo or only initial state left.');
+            return prevHistory; 
+          }
+
+          try {
+            const prevState = prevHistory[prevHistory.length - 2]; 
+            console.log('[Whiteboard handleUndo] Reverting to state from timestamp:', prevState.timestamp);
+            currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
+              console.log('[Whiteboard handleUndo] 🖌️ 恢复画布绘图状态...');
+              currentCanvas.isDrawingMode = initialIsDrawingMode; 
+              // 恢复画笔设置
+              const brush = new fabric.PencilBrush(currentCanvas);
+              brush.width = brushSize;
+              brush.color = brushColor;
+              (brush as any).decimate = 8;
+              (brush as any).controlPointsNum = 2;
+              currentCanvas.freeDrawingBrush = brush;
+              currentCanvas.renderAll();
+              console.log('[Whiteboard handleUndo] ✅ Canvas loaded from previous state with drawing mode restored.');
+            });
+            return prevHistory.slice(0, -1); 
+          } catch (error) {
+            console.error('[Whiteboard handleUndo] Failed to undo:', error);
+            return prevHistory; 
+          }
+        });
       }
       // Ctrl/Cmd + G for the new direct image generation flow
       if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
         e.preventDefault();
-        // handleOpenAIGeneration(); // Old behavior
-        handleDirectImageGeneration(); // New behavior
+        // 内联调用直接生图逻辑
+        console.log('[Whiteboard handleDirectImageGeneration] === Opening AI Generation Panel ===');
+        
+        // 获取画布快照
+        const canvas = fabricCanvasRef.current;
+        if (!canvas) {
+          console.error('[Whiteboard getCanvasSnapshotDataURL] ❌ Canvas is not available.');
+          return;
+        }
+        try {
+          const dataURL = canvas.toDataURL({
+            format: 'png',
+            quality: 0.8,
+            multiplier: 1,
+          });
+          console.log('[Whiteboard getCanvasSnapshotDataURL] ✅ Snapshot generated successfully.');
+          // Auto-download PNG
+          const link = document.createElement('a');
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          link.href = dataURL;
+          link.download = `whiteboard-snapshot-${timestamp}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          console.log('[Whiteboard getCanvasSnapshotDataURL] 💾 Snapshot auto-downloaded.');
+          setCanvasSnapshot(dataURL);
+          setIsAIGenerationOpen(true);
+        } catch (error) {
+          console.error('[Whiteboard getCanvasSnapshotDataURL] ❌ Failed to generate snapshot:', error);
+          alert('无法获取画板快照，请重试');
+        }
       }
     };
 
@@ -353,7 +433,7 @@ const Whiteboard = ({
         canvasInstance.off('mouse:up', handleMouseUpLocal);
       }
     };
-  }, [width, height, initialIsDrawingMode, handleUndo, recordState, handleDirectImageGeneration]); // 移除brushSize和brushColor，避免频繁重创画布
+  }, [width, height, initialIsDrawingMode]); // 只保留真正需要的依赖，移除recordState等函数依赖
 
   // 单独的Effect来处理画笔属性更新，避免重新创建画布
   useEffect(() => {
@@ -602,7 +682,19 @@ const Whiteboard = ({
           });
           
           // 记录历史状态
-          recordState();
+          // 内联recordState逻辑，避免函数依赖
+          const currentCanvas = fabricCanvasRef.current;
+          if (currentCanvas) {
+            console.log('[Whiteboard handleImageProcessed recordState] Recording state. Objects:', currentCanvas.getObjects().length);
+            const currentState: DrawingState = {
+              canvasState: JSON.stringify(currentCanvas.toJSON()),
+              timestamp: Date.now()
+            };
+            setHistory(prev => {
+              const newHistory = [...prev, currentState].slice(-20); 
+              return newHistory;
+            });
+          }
         }, 1500); // 稍微延长等待时间确保动画完成
 
       } catch (error: any) {
@@ -617,7 +709,19 @@ const Whiteboard = ({
         canvas.freeDrawingBrush = currentBrush || configureBrush(canvas, brushSize, brushColor);
         canvas.renderAll();
         
-        recordState();
+        // 内联recordState逻辑，避免函数依赖
+        const currentCanvas = fabricCanvasRef.current;
+        if (currentCanvas) {
+          console.log('[Whiteboard handleImageProcessed fallback recordState] Recording state. Objects:', currentCanvas.getObjects().length);
+          const currentState: DrawingState = {
+            canvasState: JSON.stringify(currentCanvas.toJSON()),
+            timestamp: Date.now()
+          };
+          setHistory(prev => {
+            const newHistory = [...prev, currentState].slice(-20); 
+            return newHistory;
+          });
+        }
       }
 
       setMenuPosition(null);
@@ -634,7 +738,7 @@ const Whiteboard = ({
     };
 
     img.src = processedImage.dataUrl;
-  }, [clickPosition, recordState, setStickerButtonPosition, brushSize, brushColor, configureBrush]);
+  }, [clickPosition, setStickerButtonPosition, brushSize, brushColor, configureBrush]); // 移除recordState依赖
 
   return (
     <div className="whiteboard-wrapper">
@@ -653,7 +757,38 @@ const Whiteboard = ({
       <div className="ai-generation-trigger">
         <button
           className="ai-generation-btn"
-          onClick={handleDirectImageGeneration} // Updated onClick
+          onClick={() => {
+            console.log('[Whiteboard DirectImageGeneration Button] === Opening AI Generation Panel ===');
+            
+            // 获取画布快照
+            const canvas = fabricCanvasRef.current;
+            if (!canvas) {
+              console.error('[Whiteboard DirectImageGeneration Button] ❌ Canvas is not available.');
+              return;
+            }
+            try {
+              const dataURL = canvas.toDataURL({
+                format: 'png',
+                quality: 0.8,
+                multiplier: 1,
+              });
+              console.log('[Whiteboard DirectImageGeneration Button] ✅ Snapshot generated successfully.');
+              // Auto-download PNG
+              const link = document.createElement('a');
+              const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+              link.href = dataURL;
+              link.download = `whiteboard-snapshot-${timestamp}.png`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              console.log('[Whiteboard DirectImageGeneration Button] 💾 Snapshot auto-downloaded.');
+              setCanvasSnapshot(dataURL);
+              setIsAIGenerationOpen(true);
+            } catch (error) {
+              console.error('[Whiteboard DirectImageGeneration Button] ❌ Failed to generate snapshot:', error);
+              alert('无法获取画板快照，请重试');
+            }
+          }}
           title="AI分析画板并自动生成图片"
           disabled={isAIGenerationOpen}
         >
