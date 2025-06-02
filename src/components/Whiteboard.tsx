@@ -251,10 +251,10 @@ const Whiteboard = ({
     }
 
     canvasInstance.isDrawingMode = initialIsDrawingMode;
-    // 初始画笔设置 - 内联创建避免依赖
+    // 初始画笔设置 - 使用固定初始值，避免依赖状态变量
     const brush = new fabric.PencilBrush(canvasInstance);
-    brush.width = brushSize;
-    brush.color = brushColor;
+    brush.width = 5; // 使用固定初始值
+    brush.color = '#000000'; // 使用固定初始值
     (brush as any).decimate = 8;
     (brush as any).controlPointsNum = 2;
     canvasInstance.freeDrawingBrush = brush;
@@ -307,10 +307,12 @@ const Whiteboard = ({
             const prevState = prevHistory[prevHistory.length - 2]; 
             currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
               currentCanvas.isDrawingMode = initialIsDrawingMode; 
-              // 恢复画笔设置 - 内联创建避免依赖
+              // 恢复画笔设置 - 使用当前状态值，确保撤销后画笔正确
+              const currentBrushSize = fabricCanvasRef.current?.freeDrawingBrush?.width || 5;
+              const currentBrushColor = fabricCanvasRef.current?.freeDrawingBrush?.color || '#000000';
               const brush = new fabric.PencilBrush(currentCanvas);
-              brush.width = brushSize;
-              brush.color = brushColor;
+              brush.width = currentBrushSize;
+              brush.color = currentBrushColor;
               (brush as any).decimate = 8;
               (brush as any).controlPointsNum = 2;
               currentCanvas.freeDrawingBrush = brush;
@@ -370,7 +372,7 @@ const Whiteboard = ({
         canvasInstance.off('mouse:up', handleMouseUpLocal);
       }
     };
-  }, [width, height, initialIsDrawingMode, brushSize, brushColor]);
+  }, [width, height, initialIsDrawingMode]);
 
   // 单独的Effect来处理画笔属性更新，避免重新创建画布
   useEffect(() => {
@@ -381,6 +383,8 @@ const Whiteboard = ({
         canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
         canvas.freeDrawingBrush.width = brushSize;
         canvas.freeDrawingBrush.color = brushColor;
+        (canvas.freeDrawingBrush as any).decimate = 8;
+        (canvas.freeDrawingBrush as any).controlPointsNum = 2;
       } else {
         canvas.freeDrawingBrush.width = brushSize;
         canvas.freeDrawingBrush.color = brushColor;
@@ -545,6 +549,9 @@ const Whiteboard = ({
       });
 
       try {
+        // 先添加图片到画布，确保图片能显示
+        canvas.add(fabricImage);
+        
         // 设置canvas引用
         fabricImage.canvas = canvas;
         
@@ -557,6 +564,9 @@ const Whiteboard = ({
             easing: 'easeOutBack'
           }
         });
+
+        // 立即渲染，不等待动画
+        canvas.renderAll();
 
         // 等待动画完成后设置交互性
         setTimeout(() => {
@@ -606,7 +616,7 @@ const Whiteboard = ({
               return newHistory;
             });
           }
-        }, 1500); // 稍微多于动画时间
+        }, 100); // 缩短等待时间，让用户更快看到效果
 
       } catch (error: any) {
         console.error('[Whiteboard] 照片效果应用失败:', error);
@@ -714,10 +724,12 @@ const Whiteboard = ({
                   const prevState = prevHistory[prevHistory.length - 2]; 
                   currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
                     currentCanvas.isDrawingMode = initialIsDrawingMode; 
-                    // 恢复画笔设置 - 内联创建避免依赖
+                    // 恢复画笔设置 - 使用当前状态值，确保撤销后画笔正确
+                    const currentBrushSize = fabricCanvasRef.current?.freeDrawingBrush?.width || 5;
+                    const currentBrushColor = fabricCanvasRef.current?.freeDrawingBrush?.color || '#000000';
                     const brush = new fabric.PencilBrush(currentCanvas);
-                    brush.width = brushSize;
-                    brush.color = brushColor;
+                    brush.width = currentBrushSize;
+                    brush.color = currentBrushColor;
                     (brush as any).decimate = 8;
                     (brush as any).controlPointsNum = 2;
                     currentCanvas.freeDrawingBrush = brush;
