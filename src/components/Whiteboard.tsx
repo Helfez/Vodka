@@ -186,7 +186,7 @@ const Whiteboard = ({
 
   // Effect for initializing and managing the Fabric canvas instance
   useEffect(() => {
-    console.log('[Whiteboard CanvasLifecycle useEffect] Running. Deps:', { width, height, initialIsDrawingMode, brushSize, brushColor });
+    console.log('[Whiteboard CanvasLifecycle useEffect] Running. Deps:', { width, height, initialIsDrawingMode });
 
     if (!canvasElRef.current) {
       console.warn('[Whiteboard CanvasLifecycle useEffect] canvasElRef is null. Bailing out.');
@@ -280,10 +280,12 @@ const Whiteboard = ({
             currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
               console.log('[Whiteboard handleUndo] 🖌️ 恢复画布绘图状态...');
               currentCanvas.isDrawingMode = initialIsDrawingMode; 
-              // 恢复画笔设置
+              // 恢复画笔设置 - 使用当前的画笔设置而不是内部变量
+              const currentBrushSize = currentCanvas.freeDrawingBrush?.width || 5;
+              const currentBrushColor = currentCanvas.freeDrawingBrush?.color || '#000000';
               const brush = new fabric.PencilBrush(currentCanvas);
-              brush.width = brushSize;
-              brush.color = brushColor;
+              brush.width = currentBrushSize;
+              brush.color = currentBrushColor;
               (brush as any).decimate = 8;
               (brush as any).controlPointsNum = 2;
               currentCanvas.freeDrawingBrush = brush;
@@ -350,7 +352,7 @@ const Whiteboard = ({
         canvasInstance.off('mouse:up', handleMouseUpLocal);
       }
     };
-  }, [width, height, initialIsDrawingMode, brushSize, brushColor]); // 添加brushSize和brushColor依赖，因为undo逻辑中使用了这些变量
+  }, [width, height, initialIsDrawingMode]); // 移除brushSize和brushColor依赖，避免画布频繁重创
 
   // 单独的Effect来处理画笔属性更新，避免重新创建画布
   useEffect(() => {
@@ -747,10 +749,12 @@ const Whiteboard = ({
                   currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
                     console.log('[Whiteboard handleUndo] 🖌️ 恢复画布绘图状态...');
                     currentCanvas.isDrawingMode = initialIsDrawingMode; 
-                    // 恢复画笔设置
+                    // 恢复画笔设置 - 使用当前的画笔设置而不是内部变量
+                    const currentBrushSize = currentCanvas.freeDrawingBrush?.width || 5;
+                    const currentBrushColor = currentCanvas.freeDrawingBrush?.color || '#000000';
                     const brush = new fabric.PencilBrush(currentCanvas);
-                    brush.width = brushSize;
-                    brush.color = brushColor;
+                    brush.width = currentBrushSize;
+                    brush.color = currentBrushColor;
                     (brush as any).decimate = 8;
                     (brush as any).controlPointsNum = 2;
                     currentCanvas.freeDrawingBrush = brush;
