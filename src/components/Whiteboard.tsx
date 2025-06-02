@@ -595,7 +595,17 @@ const Whiteboard = ({
           // 恢复画布绘图状态 - 只在动画完成后恢复一次
           console.log('[Whiteboard handleImageProcessed] 🖌️ 恢复画布绘图状态...');
           canvas.isDrawingMode = currentDrawingMode;
-          canvas.freeDrawingBrush = currentBrush || configureBrush(canvas, brushSize, brushColor);
+          // 如果没有currentBrush，创建默认画笔而不使用外部依赖
+          if (!currentBrush) {
+            const defaultBrush = new fabric.PencilBrush(canvas);
+            defaultBrush.width = 5;
+            defaultBrush.color = '#000000';
+            (defaultBrush as any).decimate = 8;
+            (defaultBrush as any).controlPointsNum = 2;
+            canvas.freeDrawingBrush = defaultBrush;
+          } else {
+            canvas.freeDrawingBrush = currentBrush;
+          }
           canvas.renderAll();
           
           console.log('[Whiteboard handleImageProcessed] ✅ 画布状态恢复完成:', { 
@@ -628,7 +638,17 @@ const Whiteboard = ({
         // 立即恢复画笔状态
         console.log('[Whiteboard handleImageProcessed] 🖌️ Fallback: 恢复画笔状态...');
         canvas.isDrawingMode = currentDrawingMode;
-        canvas.freeDrawingBrush = currentBrush || configureBrush(canvas, brushSize, brushColor);
+        // 如果没有currentBrush，创建默认画笔而不使用外部依赖
+        if (!currentBrush) {
+          const defaultBrush = new fabric.PencilBrush(canvas);
+          defaultBrush.width = 5;
+          defaultBrush.color = '#000000';
+          (defaultBrush as any).decimate = 8;
+          (defaultBrush as any).controlPointsNum = 2;
+          canvas.freeDrawingBrush = defaultBrush;
+        } else {
+          canvas.freeDrawingBrush = currentBrush;
+        }
         canvas.renderAll();
         
         // 内联recordState逻辑，避免函数依赖
@@ -655,7 +675,17 @@ const Whiteboard = ({
       console.error('[Whiteboard handleImageProcessed] ❌ 图片加载失败');
       // 恢复画布状态即使在错误情况下
       canvas.isDrawingMode = currentDrawingMode;
-      canvas.freeDrawingBrush = currentBrush || configureBrush(canvas, brushSize, brushColor);
+      // 如果没有currentBrush，创建默认画笔而不使用外部依赖
+      if (!currentBrush) {
+        const defaultBrush = new fabric.PencilBrush(canvas);
+        defaultBrush.width = 5;
+        defaultBrush.color = '#000000';
+        (defaultBrush as any).decimate = 8;
+        (defaultBrush as any).controlPointsNum = 2;
+        canvas.freeDrawingBrush = defaultBrush;
+      } else {
+        canvas.freeDrawingBrush = currentBrush;
+      }
       alert('图片加载失败，请重试');
     };
 
