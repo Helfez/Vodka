@@ -63,39 +63,30 @@ const Whiteboard = ({
 
   // --- Helper Functions ---
   
-  // 统一的画笔创建函数，避免重复代码
-  const createBrush = useCallback((canvas: FabricCanvas, width: number = 5, color: string = '#000000') => {
-    const brush = new fabric.PencilBrush(canvas);
-    brush.width = width;
-    brush.color = color;
-    (brush as any).decimate = 8;
-    (brush as any).controlPointsNum = 2;
-    return brush;
-  }, []);
+  // 移除未使用的createBrush函数 - 现在都用内联创建
+  // 移除未使用的recordCanvasState函数 - 现在都用内联记录  
+  // 移除未使用的generateCanvasSnapshot函数 - 现在都用内联生成
+  // 移除未使用的handleUndo函数 - 现在都用内联处理
+  // 移除未使用的manageSelectionRect函数 - 现在都用内联管理
 
-  // 统一的历史记录函数，避免重复代码
-  const recordCanvasState = useCallback(() => {
-    const currentCanvas = fabricCanvasRef.current;
-    if (!currentCanvas) {
-      console.warn('[Whiteboard] Cannot record state: canvas not available');
-      return;
+  // --- Callbacks ---
+
+  // 处理画笔大小变化
+  const handleBrushSizeChange = useCallback((newSize: number) => {
+    setBrushSize(newSize);
+    const canvas = fabricCanvasRef.current;
+    if (canvas?.freeDrawingBrush) {
+      canvas.freeDrawingBrush.width = newSize;
     }
-    const currentState: DrawingState = {
-      canvasState: JSON.stringify(currentCanvas.toJSON()),
-      timestamp: Date.now()
-    };
-    setHistory(prev => {
-      const newHistory = [...prev, currentState].slice(-20); 
-      return newHistory;
-    });
   }, []);
 
-  // 统一的快照生成和下载函数，避免重复代码
-  const generateCanvasSnapshot = useCallback(() => {
+  // 处理AI生成面板打开
+  const handleOpenAIPanel = useCallback(() => {
+    // 内联快照生成
     const canvas = fabricCanvasRef.current;
     if (!canvas) {
       console.error('[Whiteboard] Canvas not available for snapshot');
-      return null;
+      return;
     }
     try {
       const dataURL = canvas.toDataURL({
@@ -113,98 +104,13 @@ const Whiteboard = ({
       link.click();
       document.body.removeChild(link);
       
-      return dataURL;
+      setCanvasSnapshot(dataURL);
+      setIsAIGenerationOpen(true);
     } catch (error) {
       console.error('[Whiteboard] Failed to generate snapshot:', error);
       alert('无法获取画板快照，请重试');
-      return null;
     }
   }, []);
-
-  // 统一的撤销函数，避免重复代码
-  const handleUndo = useCallback(() => {
-    const currentCanvas = fabricCanvasRef.current;
-    if (!currentCanvas) {
-      console.warn('[Whiteboard] Cannot undo: canvas not available');
-      return;
-    }
-
-    setHistory(prevHistory => {
-      if (prevHistory.length <= 1) { 
-        return prevHistory; 
-      }
-
-      try {
-        const prevState = prevHistory[prevHistory.length - 2]; 
-        currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
-          currentCanvas.isDrawingMode = initialIsDrawingMode; 
-          // 恢复画笔设置 - 使用统一的createBrush函数，确保画笔状态正确恢复
-          const currentBrushSize = brushSize; // 使用当前的画笔大小，不是之前的
-          const currentBrushColor = brushColor; // 使用当前的画笔颜色，不是之前的
-          currentCanvas.freeDrawingBrush = createBrush(currentCanvas, currentBrushSize, currentBrushColor);
-          currentCanvas.renderAll();
-        });
-        return prevHistory.slice(0, -1); 
-      } catch (error) {
-        console.error('[Whiteboard] Undo failed:', error);
-        return prevHistory; 
-      }
-    });
-  }, [initialIsDrawingMode, createBrush, brushSize, brushColor]);
-
-  // 统一的选择矩形管理函数，避免重复代码
-  const manageSelectionRect = useCallback((canvas: FabricCanvas, bounds?: { left: number; top: number; width: number; height: number } | null) => {
-    // 移除现有的选择矩形
-    const objects = canvas.getObjects();
-    const existingSelection = objects.find(obj => 
-      obj.type === 'rect' && 
-      (obj as any).data?.type === 'selection-rect'
-    );
-    if (existingSelection) {
-      canvas.remove(existingSelection);
-    }
-
-    // 如果提供了bounds，创建新的选择矩形
-    if (bounds) {
-      const selectionRect = new fabric.Rect({
-        left: bounds.left - 2,
-        top: bounds.top - 2,
-        width: bounds.width + 4,
-        height: bounds.height + 4,
-        fill: 'transparent',
-        stroke: '#2196F3',
-        strokeWidth: 2,
-        selectable: false,
-        evented: false,
-        data: { type: 'selection-rect' }
-      });
-      
-      canvas.add(selectionRect);
-    }
-    
-    canvas.renderAll();
-  }, []);
-
-  // --- Callbacks ---
-
-  // 处理画笔大小变化
-  const handleBrushSizeChange = useCallback((newSize: number) => {
-    setBrushSize(newSize);
-    const canvas = fabricCanvasRef.current;
-    if (canvas?.freeDrawingBrush) {
-      canvas.freeDrawingBrush.width = newSize;
-    }
-  }, []);
-
-  // 处理AI生成面板打开
-  const handleOpenAIPanel = useCallback(() => {
-    // 生成快照并打开AI面板
-    const dataURL = generateCanvasSnapshot();
-    if (dataURL) {
-      setCanvasSnapshot(dataURL);
-      setIsAIGenerationOpen(true);
-    }
-  }, [generateCanvasSnapshot]);
 
   // 处理AI生成的图片
   const handleAIImageGenerated = useCallback((imageUrl: string) => {
@@ -462,13 +368,15 @@ const Whiteboard = ({
     if (canvas) {
       // 总是更新画笔属性，不管是否在绘图模式下
       if (!canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush = createBrush(canvas, brushSize, brushColor);
+        canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+        canvas.freeDrawingBrush.width = brushSize;
+        canvas.freeDrawingBrush.color = brushColor;
       } else {
         canvas.freeDrawingBrush.width = brushSize;
         canvas.freeDrawingBrush.color = brushColor;
       }
     }
-  }, [brushSize, brushColor, createBrush]);
+  }, [brushSize, brushColor]);
 
   // Effect for setting the initial history
   useEffect(() => {
@@ -516,8 +424,31 @@ const Whiteboard = ({
     if (clickedImage) {
       const bounds = clickedImage.getBoundingRect();
       
-      // 使用统一的选择矩形管理函数
-      manageSelectionRect(canvas, bounds);
+      // 内联选择矩形管理 - 移除现有的选择矩形
+      const existingSelection = objects.find(obj => 
+        obj.type === 'rect' && 
+        (obj as any).data?.type === 'selection-rect'
+      );
+      if (existingSelection) {
+        canvas.remove(existingSelection);
+      }
+
+      // 创建新的选择矩形
+      const selectionRect = new fabric.Rect({
+        left: bounds.left - 2,
+        top: bounds.top - 2,
+        width: bounds.width + 4,
+        height: bounds.height + 4,
+        fill: 'transparent',
+        stroke: '#2196F3',
+        strokeWidth: 2,
+        selectable: false,
+        evented: false,
+        data: { type: 'selection-rect' }
+      });
+      
+      canvas.add(selectionRect);
+      canvas.renderAll();
 
       setStickerButtonPosition({
         x: bounds.left + bounds.width / 2,
@@ -526,13 +457,20 @@ const Whiteboard = ({
       });
     } else {
       // 移除现有选择矩形
-      manageSelectionRect(canvas, null);
+      const existingSelection = objects.find(obj => 
+        obj.type === 'rect' && 
+        (obj as any).data?.type === 'selection-rect'
+      );
+      if (existingSelection) {
+        canvas.remove(existingSelection);
+        canvas.renderAll();
+      }
 
       setMenuPosition({ x: event.clientX, y: event.clientY });
       setClickPosition({ x, y });
       setStickerButtonPosition(null);
     }
-  }, [manageSelectionRect]);
+  }, []);
 
   // 处理贴纸转换
   const handleStickerConvert = useCallback((imageUrl: string) => {
@@ -548,11 +486,18 @@ const Whiteboard = ({
     }
 
     // Record state before conversion
-    recordCanvasState();
+    const currentState: DrawingState = {
+      canvasState: JSON.stringify(canvas.toJSON()),
+      timestamp: Date.now()
+    };
+    setHistory(prev => {
+      const newHistory = [...prev, currentState].slice(-20); 
+      return newHistory;
+    });
 
     // Close sticker button
     setStickerButtonPosition(null);
-  }, [recordCanvasState]);
+  }, []);
 
   // 处理图片上传
   const handleImageProcessed = useCallback(async (processedImage: ProcessedImage) => {
@@ -743,7 +688,38 @@ const Whiteboard = ({
         >
           <UndoButton 
             canUndo={history.length > 1}
-            onUndo={handleUndo}
+            onUndo={() => {
+              const currentCanvas = fabricCanvasRef.current;
+              if (!currentCanvas) {
+                console.warn('[Whiteboard] Cannot undo: canvas not available');
+                return;
+              }
+
+              setHistory(prevHistory => {
+                if (prevHistory.length <= 1) { 
+                  return prevHistory; 
+                }
+
+                try {
+                  const prevState = prevHistory[prevHistory.length - 2]; 
+                  currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
+                    currentCanvas.isDrawingMode = initialIsDrawingMode; 
+                    // 恢复画笔设置 - 内联创建避免依赖
+                    const brush = new fabric.PencilBrush(currentCanvas);
+                    brush.width = brushSize;
+                    brush.color = brushColor;
+                    (brush as any).decimate = 8;
+                    (brush as any).controlPointsNum = 2;
+                    currentCanvas.freeDrawingBrush = brush;
+                    currentCanvas.renderAll();
+                  });
+                  return prevHistory.slice(0, -1); 
+                } catch (error) {
+                  console.error('[Whiteboard] Undo failed:', error);
+                  return prevHistory; 
+                }
+              });
+            }}
           />
           <div className="canvas-wrapper">
             <canvas ref={canvasElRef} />
