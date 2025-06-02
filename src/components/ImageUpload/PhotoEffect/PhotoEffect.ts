@@ -92,8 +92,14 @@ export class PhotoEffect {
       angle: animation.initial.rotation + randomRotation
     });
 
-    // 添加到画布
-    canvas.add(fabricImage);
+    // 🔥 修复：检查图片是否已经在画布中，避免重复添加
+    const isImageInCanvas = canvas.getObjects().indexOf(fabricImage) !== -1;
+    if (!isImageInCanvas) {
+      console.log('[PhotoEffect] Adding image to canvas');
+      canvas.add(fabricImage);
+    } else {
+      console.log('[PhotoEffect] Image already in canvas, skipping add');
+    }
 
     // 应用动画 - 动画到当前scale
     fabricImage.animate({
