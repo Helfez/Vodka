@@ -80,6 +80,16 @@ const Whiteboard = ({
     }
   }, []);
 
+  // 处理画笔颜色变化 - 为未来功能预留
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleBrushColorChange = useCallback((newColor: string) => {
+    setBrushColor(newColor);
+    const canvas = fabricCanvasRef.current;
+    if (canvas?.freeDrawingBrush) {
+      canvas.freeDrawingBrush.color = newColor;
+    }
+  }, []);
+
   // 处理AI生成面板打开
   const handleOpenAIPanel = useCallback(() => {
     // 内联快照生成
