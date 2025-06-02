@@ -31,19 +31,6 @@ interface WhiteboardProps {
   isDrawingMode?: boolean;
 }
 
-// 配置画笔函数
-const configureBrush = (canvas: FabricCanvas, size: number, color: string) => {
-  console.log('[Whiteboard configureBrush] Configuring brush with size:', size);
-  const brush = new fabric.PencilBrush(canvas);
-  brush.width = size;
-  brush.color = color;
-  
-  // 添加贝塞尔曲线平滑
-  (brush as any).decimate = 8;         // 采样点间隔
-  (brush as any).controlPointsNum = 2; // 控制点数量
-  return brush;
-};
-
 // Whiteboard component: Main component for the drawing canvas
 const Whiteboard = ({ 
   width = 800, 
@@ -76,6 +63,19 @@ const Whiteboard = ({
 
   // State for log viewer
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
+
+  // 配置画笔函数 - 移到组件内部使用useCallback
+  const configureBrush = useCallback((canvas: FabricCanvas, size: number, color: string) => {
+    console.log('[Whiteboard configureBrush] Configuring brush with size:', size);
+    const brush = new fabric.PencilBrush(canvas);
+    brush.width = size;
+    brush.color = color;
+    
+    // 添加贝塞尔曲线平滑
+    (brush as any).decimate = 8;         // 采样点间隔
+    (brush as any).controlPointsNum = 2; // 控制点数量
+    return brush;
+  }, []);
 
   // --- Callbacks --- 
 
@@ -128,7 +128,7 @@ const Whiteboard = ({
         return prevHistory; 
       }
     });
-  }, [setHistory, fabricCanvasRef, brushSize, brushColor, initialIsDrawingMode]); 
+  }, [setHistory, fabricCanvasRef, brushSize, brushColor, initialIsDrawingMode, configureBrush]);
 
   // Helper to get canvas snapshot
   const getCanvasSnapshotDataURL = useCallback((): string | null => {
@@ -263,7 +263,7 @@ const Whiteboard = ({
     };
 
     img.src = imageUrl;
-  }, [clickPosition, recordState, brushSize, brushColor]);
+  }, [clickPosition, recordState, brushSize, brushColor, configureBrush]);
 
   // --- Effects --- 
 
@@ -298,8 +298,13 @@ const Whiteboard = ({
 
     console.log('[Whiteboard CanvasLifecycle useEffect] Applying properties. DrawingMode:', initialIsDrawingMode);
     canvasInstance.isDrawingMode = initialIsDrawingMode;
-    // 初始画笔设置将在单独的Effect中处理，避免依赖问题
-    canvasInstance.freeDrawingBrush = configureBrush(canvasInstance, 5, '#000000'); // 使用默认值
+    // 初始画笔设置 - 使用内联创建避免依赖问题
+    const initialBrush = new fabric.PencilBrush(canvasInstance);
+    initialBrush.width = 5;
+    initialBrush.color = '#000000';
+    (initialBrush as any).decimate = 8;
+    (initialBrush as any).controlPointsNum = 2;
+    canvasInstance.freeDrawingBrush = initialBrush;
     canvasInstance.renderOnAddRemove = true; 
     canvasInstance.preserveObjectStacking = true;
 
@@ -363,7 +368,7 @@ const Whiteboard = ({
         canvas.freeDrawingBrush.color = brushColor;
       }
     }
-  }, [brushSize, brushColor]);
+  }, [brushSize, brushColor, configureBrush]);
 
   // Effect for setting the initial history
   useEffect(() => {
@@ -629,7 +634,7 @@ const Whiteboard = ({
     };
 
     img.src = processedImage.dataUrl;
-  }, [clickPosition, recordState, setStickerButtonPosition, brushSize, brushColor]);
+  }, [clickPosition, recordState, setStickerButtonPosition, brushSize, brushColor, configureBrush]);
 
   return (
     <div className="whiteboard-wrapper">
