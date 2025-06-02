@@ -116,10 +116,11 @@ const Whiteboard = ({
         const prevState = prevHistory[prevHistory.length - 2]; 
         console.log('[Whiteboard handleUndo] Reverting to state from timestamp:', prevState.timestamp);
         currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
-          currentCanvas.renderAll();
+          console.log('[Whiteboard handleUndo] 🖌️ 恢复画布绘图状态...');
           currentCanvas.isDrawingMode = initialIsDrawingMode; 
           currentCanvas.freeDrawingBrush = configureBrush(currentCanvas, brushSize, brushColor);
-          console.log('[Whiteboard handleUndo] Canvas loaded from previous state.');
+          currentCanvas.renderAll();
+          console.log('[Whiteboard handleUndo] ✅ Canvas loaded from previous state with drawing mode restored.');
         });
         return prevHistory.slice(0, -1); 
       } catch (error) {
@@ -186,6 +187,11 @@ const Whiteboard = ({
       return;
     }
 
+    // 保存当前画布状态
+    const currentDrawingMode = canvas.isDrawingMode;
+    const currentBrush = canvas.freeDrawingBrush;
+    console.log('[Whiteboard handleAIImageGenerated] 💾 保存画布状态:', { drawingMode: currentDrawingMode, brushWidth: currentBrush?.width });
+
     console.log('[Whiteboard handleAIImageGenerated] 🖼️ 开始加载图片...');
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -227,6 +233,11 @@ const Whiteboard = ({
         console.log('[Whiteboard handleAIImageGenerated] ➕ 添加图片到画布...');
         canvas.add(fabricImage);
         canvas.setActiveObject(fabricImage);
+        
+        // 恢复画布绘图状态
+        console.log('[Whiteboard handleAIImageGenerated] 🖌️ 恢复画布绘图状态...');
+        canvas.isDrawingMode = currentDrawingMode;
+        canvas.freeDrawingBrush = currentBrush || configureBrush(canvas, brushSize, brushColor);
         canvas.renderAll();
 
         console.log('[Whiteboard handleAIImageGenerated] 💾 记录历史状态...');
@@ -237,15 +248,22 @@ const Whiteboard = ({
         console.log('[Whiteboard handleAIImageGenerated] ✅ AI图片集成完成');
       } catch (error) {
         console.error('[Whiteboard handleAIImageGenerated] ❌ 图片添加到画布失败:', error);
+        // 即使出错也要恢复画布状态
+        canvas.isDrawingMode = currentDrawingMode;
+        canvas.freeDrawingBrush = currentBrush || configureBrush(canvas, brushSize, brushColor);
+        canvas.renderAll();
       }
     };
 
     img.onerror = (errorEvent) => {
       console.error('[Whiteboard handleAIImageGenerated] ❌ 图片加载失败:', errorEvent);
+      // 恢复画布状态即使在错误情况下
+      canvas.isDrawingMode = currentDrawingMode;
+      canvas.freeDrawingBrush = currentBrush || configureBrush(canvas, brushSize, brushColor);
     };
 
     img.src = imageUrl;
-  }, [clickPosition, recordState]);
+  }, [clickPosition, recordState, brushSize, brushColor]);
 
   // --- Effects --- 
 
@@ -358,7 +376,10 @@ const Whiteboard = ({
   // Handler for context menu (right-click)
   const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     console.log('[Whiteboard handleContextMenu] === 右键菜单事件触发 ===');
+    console.log('[Whiteboard handleContextMenu] 事件类型:', event.type);
     console.log('[Whiteboard handleContextMenu] 鼠标位置:', event.clientX, event.clientY);
+    console.log('[Whiteboard handleContextMenu] 当前target:', event.currentTarget);
+    
     event.preventDefault();
     event.stopPropagation();
     
@@ -368,14 +389,24 @@ const Whiteboard = ({
     }
     
     const canvas = fabricCanvasRef.current;
+    console.log('[Whiteboard handleContextMenu] ✅ Canvas状态:', {
+      width: canvas.getWidth(),
+      height: canvas.getHeight(),
+      isDrawingMode: canvas.isDrawingMode,
+      objectsCount: canvas.getObjects().length
+    });
     
     const rect = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     
-    console.log('[Whiteboard handleContextMenu] 画布内相对位置:', x, y);
+    console.log('[Whiteboard handleContextMenu] 相对位置计算:');
+    console.log('  - 容器边界:', rect);
+    console.log('  - 画布内相对位置:', x, y);
     
     const pointer = canvas.getPointer(event.nativeEvent);
+    console.log('[Whiteboard handleContextMenu] Fabric指针位置:', pointer);
+    
     const objects = canvas.getObjects();
     const clickedImage = objects.find(obj => 
       obj instanceof fabric.Image && 
@@ -384,6 +415,13 @@ const Whiteboard = ({
 
     if (clickedImage) {
       console.log('[Whiteboard handleContextMenu] 🖼️ 点击到图片，显示贴纸按钮');
+      console.log('[Whiteboard handleContextMenu] 图片信息:', {
+        left: clickedImage.left,
+        top: clickedImage.top,
+        width: clickedImage.width,
+        height: clickedImage.height
+      });
+      
       const bounds = clickedImage.getBoundingRect();
       
       const existingSelection = objects.find(obj => 
@@ -415,6 +453,8 @@ const Whiteboard = ({
         y: bounds.top - 20,
         target: clickedImage
       });
+      
+      console.log('[Whiteboard handleContextMenu] 贴纸按钮位置设置完成');
     } else {
       console.log('[Whiteboard handleContextMenu] 📋 点击空白区域，显示上传菜单');
       const existingSelection = objects.find(obj => 
@@ -432,6 +472,8 @@ const Whiteboard = ({
       setMenuPosition({ x: event.clientX, y: event.clientY });
       setClickPosition({ x, y });
       setStickerButtonPosition(null);
+      
+      console.log('[Whiteboard handleContextMenu] 菜单状态设置完成');
     }
     
     console.log('[Whiteboard handleContextMenu] === 右键菜单事件处理完成 ===');
@@ -457,6 +499,11 @@ const Whiteboard = ({
 
     const canvas = fabricCanvasRef.current;
     console.log('[Whiteboard handleImageProcessed] 📍 放置位置:', clickPosition);
+    
+    // 保存当前画布状态 - 在图片处理开始前保存
+    const currentDrawingMode = canvas.isDrawingMode;
+    const currentBrush = canvas.freeDrawingBrush;
+    console.log('[Whiteboard handleImageProcessed] 💾 保存画布状态:', { drawingMode: currentDrawingMode, brushWidth: currentBrush?.width });
     
     const img = new Image();
     const loadStartTime = performance.now();
@@ -487,10 +534,6 @@ const Whiteboard = ({
       try {
         console.log('[Whiteboard handleImageProcessed] ✨ 应用拍立得照片效果...');
         
-        // 保存当前画布状态
-        const currentDrawingMode = canvas.isDrawingMode;
-        const currentBrush = canvas.freeDrawingBrush;
-        
         // 使用PhotoEffect创建拍立得效果
         PhotoEffect.applyPhotoEffect(fabricImage, {
           animation: {
@@ -501,12 +544,9 @@ const Whiteboard = ({
           }
         });
 
-        // 恢复画布绘图状态
-        canvas.isDrawingMode = currentDrawingMode;
-        canvas.freeDrawingBrush = currentBrush;
-
-        // 动画完成后设置为可交互
+        // 动画完成后设置为可交互并恢复画布状态
         setTimeout(() => {
+          console.log('[Whiteboard handleImageProcessed] 🔧 设置图片为可交互状态...');
           fabricImage.set({ 
             selectable: true, 
             hasControls: true, 
@@ -529,29 +569,35 @@ const Whiteboard = ({
             setStickerButtonPosition(null);
           });
           
-          // 再次确保画布状态正确
+          // 恢复画布绘图状态 - 只在动画完成后恢复一次
+          console.log('[Whiteboard handleImageProcessed] 🖌️ 恢复画布绘图状态...');
           canvas.isDrawingMode = currentDrawingMode;
-          canvas.freeDrawingBrush = currentBrush;
+          canvas.freeDrawingBrush = currentBrush || configureBrush(canvas, brushSize, brushColor);
           canvas.renderAll();
-        }, 1400);
+          
+          console.log('[Whiteboard handleImageProcessed] ✅ 画布状态恢复完成:', { 
+            drawingMode: canvas.isDrawingMode, 
+            brushWidth: canvas.freeDrawingBrush?.width 
+          });
+          
+          // 记录历史状态
+          recordState();
+        }, 1500); // 稍微延长等待时间确保动画完成
 
       } catch (error: any) {
         console.error('[Whiteboard handleImageProcessed] ❌ 照片效果应用失败:', error);
-        // fallback: 简单添加图片
+        // fallback: 简单添加图片并立即恢复状态
         canvas.add(fabricImage);
         fabricImage.set({ selectable: true, hasControls: true, evented: true });
         
-        // 确保画笔状态正确
-        canvas.isDrawingMode = initialIsDrawingMode;
-        canvas.freeDrawingBrush = configureBrush(canvas, brushSize, brushColor);
+        // 立即恢复画笔状态
+        console.log('[Whiteboard handleImageProcessed] 🖌️ Fallback: 恢复画笔状态...');
+        canvas.isDrawingMode = currentDrawingMode;
+        canvas.freeDrawingBrush = currentBrush || configureBrush(canvas, brushSize, brushColor);
         canvas.renderAll();
-      }
-
-      console.log('[Whiteboard handleImageProcessed] 💾 记录历史状态...');
-      // 延迟记录状态，等动画完成
-      setTimeout(() => {
+        
         recordState();
-      }, 1500);
+      }
 
       setMenuPosition(null);
       setClickPosition(null);
@@ -560,11 +606,14 @@ const Whiteboard = ({
 
     img.onerror = () => {
       console.error('[Whiteboard handleImageProcessed] ❌ 图片加载失败');
+      // 恢复画布状态即使在错误情况下
+      canvas.isDrawingMode = currentDrawingMode;
+      canvas.freeDrawingBrush = currentBrush || configureBrush(canvas, brushSize, brushColor);
       alert('图片加载失败，请重试');
     };
 
     img.src = processedImage.dataUrl;
-  }, [clickPosition, recordState, setStickerButtonPosition, initialIsDrawingMode, brushSize, brushColor]);
+  }, [clickPosition, recordState, setStickerButtonPosition, brushSize, brushColor]);
 
   return (
     <div className="whiteboard-wrapper">
