@@ -4,7 +4,7 @@ import { SUPPORTED_FORMATS } from './types/image.types';
 
 interface ImageUploaderProps {
   onImageProcessed: (image: ProcessedImage) => void;
-  children: React.ReactNode;
+  children: React.ReactNode | ((triggerUpload: () => void) => React.ReactNode);
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({
@@ -47,9 +47,13 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({
 
   return (
     <>
-      <div onClick={handleClick} style={{ cursor: 'pointer' }}>
-        {children}
-      </div>
+      {typeof children === 'function' ? (
+        children(handleClick)
+      ) : (
+        <div onClick={handleClick} style={{ cursor: 'pointer' }}>
+          {children}
+        </div>
+      )}
       <input
         ref={inputRef}
         type="file"

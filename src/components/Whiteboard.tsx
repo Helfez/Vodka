@@ -557,14 +557,16 @@ const Whiteboard = ({
           </div>
           {menuPosition && (
             <ImageUploader onImageProcessed={handleImageProcessed}>
-              <FloatingMenu
-                position={menuPosition}
-                onUploadClick={() => {}} // This probably triggers the uploader
-                onClose={() => {
-                  setMenuPosition(null);
-                  setClickPosition(null);
-                }}
-              />
+              {(triggerUpload) => (
+                <FloatingMenu
+                  position={menuPosition}
+                  onUploadClick={triggerUpload}
+                  onClose={() => {
+                    setMenuPosition(null);
+                    setClickPosition(null);
+                  }}
+                />
+              )}
             </ImageUploader>
           )}
           {stickerButtonPosition && (
