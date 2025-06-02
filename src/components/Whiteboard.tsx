@@ -37,8 +37,6 @@ const Whiteboard = ({
   height = 600, 
   isDrawingMode: initialIsDrawingMode = true // Renamed prop to avoid conflict with canvas property
 }: WhiteboardProps) => {
-  console.log('[Whiteboard] Component rendered/re-rendered');
-
   // Refs for canvas DOM element and Fabric canvas instance
   const canvasElRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
@@ -79,10 +77,9 @@ const Whiteboard = ({
   const recordCanvasState = useCallback(() => {
     const currentCanvas = fabricCanvasRef.current;
     if (!currentCanvas) {
-      console.warn('[Whiteboard recordCanvasState] Canvas ref is null, cannot record state.');
+      console.warn('[Whiteboard] Cannot record state: canvas not available');
       return;
     }
-    console.log('[Whiteboard recordCanvasState] Recording state. Objects:', currentCanvas.getObjects().length);
     const currentState: DrawingState = {
       canvasState: JSON.stringify(currentCanvas.toJSON()),
       timestamp: Date.now()
@@ -97,7 +94,7 @@ const Whiteboard = ({
   const generateCanvasSnapshot = useCallback(() => {
     const canvas = fabricCanvasRef.current;
     if (!canvas) {
-      console.error('[Whiteboard generateCanvasSnapshot] ❌ Canvas is not available.');
+      console.error('[Whiteboard] Canvas not available for snapshot');
       return null;
     }
     try {
@@ -106,7 +103,6 @@ const Whiteboard = ({
         quality: 0.8,
         multiplier: 1,
       });
-      console.log('[Whiteboard generateCanvasSnapshot] ✅ Snapshot generated successfully.');
       
       // Auto-download PNG
       const link = document.createElement('a');
@@ -116,11 +112,10 @@ const Whiteboard = ({
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      console.log('[Whiteboard generateCanvasSnapshot] 💾 Snapshot auto-downloaded.');
       
       return dataURL;
     } catch (error) {
-      console.error('[Whiteboard generateCanvasSnapshot] ❌ Failed to generate snapshot:', error);
+      console.error('[Whiteboard] Failed to generate snapshot:', error);
       alert('无法获取画板快照，请重试');
       return null;
     }
@@ -130,33 +125,28 @@ const Whiteboard = ({
   const handleUndo = useCallback(() => {
     const currentCanvas = fabricCanvasRef.current;
     if (!currentCanvas) {
-      console.warn('[Whiteboard handleUndo] Canvas ref is null, cannot undo.');
+      console.warn('[Whiteboard] Cannot undo: canvas not available');
       return;
     }
 
     setHistory(prevHistory => {
-      console.log('[Whiteboard handleUndo] Attempting undo. History length:', prevHistory.length);
       if (prevHistory.length <= 1) { 
-        console.log('[Whiteboard handleUndo] No more states to undo or only initial state left.');
         return prevHistory; 
       }
 
       try {
         const prevState = prevHistory[prevHistory.length - 2]; 
-        console.log('[Whiteboard handleUndo] Reverting to state from timestamp:', prevState.timestamp);
         currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
-          console.log('[Whiteboard handleUndo] 🖌️ 恢复画布绘图状态...');
           currentCanvas.isDrawingMode = initialIsDrawingMode; 
           // 恢复画笔设置 - 使用统一的createBrush函数，确保画笔状态正确恢复
           const currentBrushSize = brushSize; // 使用当前的画笔大小，不是之前的
           const currentBrushColor = brushColor; // 使用当前的画笔颜色，不是之前的
           currentCanvas.freeDrawingBrush = createBrush(currentCanvas, currentBrushSize, currentBrushColor);
           currentCanvas.renderAll();
-          console.log('[Whiteboard handleUndo] ✅ Canvas loaded from previous state with drawing mode restored.');
         });
         return prevHistory.slice(0, -1); 
       } catch (error) {
-        console.error('[Whiteboard handleUndo] Failed to undo:', error);
+        console.error('[Whiteboard] Undo failed:', error);
         return prevHistory; 
       }
     });
@@ -199,7 +189,6 @@ const Whiteboard = ({
 
   // 处理画笔大小变化
   const handleBrushSizeChange = useCallback((newSize: number) => {
-    console.log('[Whiteboard handleBrushSizeChange] New size:', newSize);
     setBrushSize(newSize);
     const canvas = fabricCanvasRef.current;
     if (canvas?.freeDrawingBrush) {
@@ -209,8 +198,6 @@ const Whiteboard = ({
 
   // 处理AI生成面板打开
   const handleOpenAIPanel = useCallback(() => {
-    console.log('[Whiteboard handleOpenAIPanel] === Opening AI Generation Panel ===');
-    
     // 生成快照并打开AI面板
     const dataURL = generateCanvasSnapshot();
     if (dataURL) {
@@ -221,8 +208,6 @@ const Whiteboard = ({
 
   // 处理AI生成的图片
   const handleAIImageGenerated = useCallback((imageUrl: string) => {
-    console.log('[Whiteboard] AI图片集成开始');
-    
     const canvas = fabricCanvasRef.current;
     if (!canvas) {
       console.error('[Whiteboard] Canvas不可用，无法添加图片');
@@ -273,8 +258,6 @@ const Whiteboard = ({
           // 记录历史状态
           recordCanvasState();
         });
-
-        console.log('[Whiteboard] AI图片集成完成');
       } catch (error) {
         console.error('[Whiteboard] 图片添加到画布失败:', error);
         // 恢复画布状态
@@ -306,10 +289,8 @@ const Whiteboard = ({
 
   // Effect for initializing and managing the Fabric canvas instance
   useEffect(() => {
-    console.log('[Whiteboard CanvasLifecycle useEffect] Running. Deps:', { width, height, initialIsDrawingMode });
-
     if (!canvasElRef.current) {
-      console.warn('[Whiteboard CanvasLifecycle useEffect] canvasElRef is null. Bailing out.');
+      console.warn('[Whiteboard] Canvas element not available');
       return;
     }
 
@@ -317,10 +298,8 @@ const Whiteboard = ({
 
     if (!canvasInstance || canvasInstance.getWidth() !== width || canvasInstance.getHeight() !== height) {
       if (canvasInstance) {
-        console.log('[Whiteboard CanvasLifecycle useEffect] Disposing existing canvas.');
         canvasInstance.dispose(); 
       }
-      console.log('[Whiteboard CanvasLifecycle useEffect] Creating new Fabric canvas.');
       canvasInstance = new fabric.Canvas(canvasElRef.current, {
         width,
         height,
@@ -328,12 +307,8 @@ const Whiteboard = ({
         isDrawingMode: initialIsDrawingMode, 
       }) as FabricCanvas;
       fabricCanvasRef.current = canvasInstance; 
-      console.log('[Whiteboard CanvasLifecycle useEffect] New canvas created.');
-    } else {
-      console.log('[Whiteboard CanvasLifecycle useEffect] Using existing canvas.');
     }
 
-    console.log('[Whiteboard CanvasLifecycle useEffect] Applying properties. DrawingMode:', initialIsDrawingMode);
     canvasInstance.isDrawingMode = initialIsDrawingMode;
     // 初始画笔设置 - 使用统一的createBrush函数
     canvasInstance.freeDrawingBrush = createBrush(canvasInstance, brushSize, brushColor);
@@ -341,20 +316,18 @@ const Whiteboard = ({
     canvasInstance.preserveObjectStacking = true;
 
     const handleMouseDownLocal = (e: fabric.TEvent) => { 
-      console.log('[Whiteboard mouse:down] Event:', e);
       if (fabricCanvasRef.current?.isDrawingMode) {
         setStickerButtonPosition(null); 
       }
     };
 
     const handlePathCreatedLocal = (e: fabric.TEvent & { path: fabric.Path }) => { 
-      console.log('[Whiteboard path:created] Path created:', e.path);
       // 记录当前状态到历史 - 使用统一的recordCanvasState函数
       recordCanvasState();
     };
 
     const handleMouseUpLocal = (e: fabric.TEvent) => { 
-      console.log('[Whiteboard mouse:up] Event:', e);
+      // Mouse up handler - kept for future use
     };
 
     const handleKeyboardLocal = (e: KeyboardEvent) => {
@@ -366,9 +339,6 @@ const Whiteboard = ({
       // Ctrl/Cmd + G for the new direct image generation flow
       if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
         e.preventDefault();
-        // 内联调用直接生图逻辑
-        console.log('[Whiteboard handleDirectImageGeneration] === Opening AI Generation Panel ===');
-        
         // 生成快照并打开AI面板
         const dataURL = generateCanvasSnapshot();
         if (dataURL) {
@@ -378,17 +348,14 @@ const Whiteboard = ({
       }
     };
 
-    console.log('[Whiteboard CanvasLifecycle useEffect] Attaching event listeners.');
     canvasInstance.on('mouse:down', handleMouseDownLocal);
     canvasInstance.on('path:created', handlePathCreatedLocal);
     canvasInstance.on('mouse:up', handleMouseUpLocal);
     window.addEventListener('keydown', handleKeyboardLocal);
 
     return () => {
-      console.log('[Whiteboard CanvasLifecycle useEffect Cleanup] Cleaning up listeners.');
       window.removeEventListener('keydown', handleKeyboardLocal);
       if (canvasInstance && fabricCanvasRef.current === canvasInstance) {
-        console.log('[Whiteboard CanvasLifecycle useEffect Cleanup] Detaching listeners.');
         canvasInstance.off('mouse:down', handleMouseDownLocal);
         canvasInstance.off('path:created', handlePathCreatedLocal);
         canvasInstance.off('mouse:up', handleMouseUpLocal);
@@ -400,7 +367,6 @@ const Whiteboard = ({
   useEffect(() => {
     const canvas = fabricCanvasRef.current;
     if (canvas && canvas.isDrawingMode) {
-      console.log('[Whiteboard BrushUpdate useEffect] Updating brush properties:', { brushSize, brushColor });
       // 总是创建新画笔以确保属性正确应用，避免属性不同步
       canvas.freeDrawingBrush = createBrush(canvas, brushSize, brushColor);
     }
@@ -409,60 +375,39 @@ const Whiteboard = ({
   // Effect for setting the initial history
   useEffect(() => {
     if (fabricCanvasRef.current && history.length === 0) {
-      console.log('[Whiteboard InitialHistory useEffect] Setting initial history state.');
       const initialState: DrawingState = {
         canvasState: JSON.stringify(fabricCanvasRef.current.toJSON()), 
         timestamp: Date.now()
       };
       setHistory([initialState]); 
-      console.log('[Whiteboard InitialHistory useEffect] Initial history state set.');
     }
-  }, [history.length]); // 移除fabricCanvasRef依赖，避免死循环
+  }, [history.length]);
 
   // Effect for component unmount
   useEffect(() => {
     return () => {
       if (fabricCanvasRef.current) {
-        console.log('[Whiteboard Unmount Cleanup] Disposing canvas on component unmount.');
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
       }
     };
-  }, []); 
+  }, []);
 
   // Handler for context menu (right-click)
   const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    console.log('[Whiteboard handleContextMenu] === 右键菜单事件触发 ===');
-    console.log('[Whiteboard handleContextMenu] 事件类型:', event.type);
-    console.log('[Whiteboard handleContextMenu] 鼠标位置:', event.clientX, event.clientY);
-    console.log('[Whiteboard handleContextMenu] 当前target:', event.currentTarget);
-    
     event.preventDefault();
     event.stopPropagation();
     
     if (!fabricCanvasRef.current) {
-      console.warn('[Whiteboard handleContextMenu] ❌ Canvas不可用');
+      console.warn('[Whiteboard] Canvas not available for context menu');
       return;
     }
     
     const canvas = fabricCanvasRef.current;
-    console.log('[Whiteboard handleContextMenu] ✅ Canvas状态:', {
-      width: canvas.getWidth(),
-      height: canvas.getHeight(),
-      isDrawingMode: canvas.isDrawingMode,
-      objectsCount: canvas.getObjects().length
-    });
-    
     const rect = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    
-    console.log('[Whiteboard handleContextMenu] 相对位置计算:');
-    console.log('  - 容器边界:', rect);
-    console.log('  - 画布内相对位置:', x, y);
-    
     const pointer = canvas.getPointer(event.nativeEvent);
-    console.log('[Whiteboard handleContextMenu] Fabric指针位置:', pointer);
     
     const objects = canvas.getObjects();
     const clickedImage = objects.find(obj => 
@@ -471,14 +416,6 @@ const Whiteboard = ({
     ) as fabric.Image | undefined;
 
     if (clickedImage) {
-      console.log('[Whiteboard handleContextMenu] 🖼️ 点击到图片，显示贴纸按钮');
-      console.log('[Whiteboard handleContextMenu] 图片信息:', {
-        left: clickedImage.left,
-        top: clickedImage.top,
-        width: clickedImage.width,
-        height: clickedImage.height
-      });
-      
       const bounds = clickedImage.getBoundingRect();
       
       // 使用统一的选择矩形管理函数
@@ -489,39 +426,26 @@ const Whiteboard = ({
         y: bounds.top - 20,
         target: clickedImage
       });
-      
-      console.log('[Whiteboard handleContextMenu] 贴纸按钮位置设置完成');
     } else {
-      console.log('[Whiteboard handleContextMenu] 📋 点击空白区域，显示上传菜单');
-      
       // 移除现有选择矩形
       manageSelectionRect(canvas, null);
 
-      console.log('[Whiteboard handleContextMenu] 设置菜单位置:', { x: event.clientX, y: event.clientY });
-      console.log('[Whiteboard handleContextMenu] 设置点击位置:', { x, y });
-      
       setMenuPosition({ x: event.clientX, y: event.clientY });
       setClickPosition({ x, y });
       setStickerButtonPosition(null);
-      
-      console.log('[Whiteboard handleContextMenu] 菜单状态设置完成');
     }
-    
-    console.log('[Whiteboard handleContextMenu] === 右键菜单事件处理完成 ===');
   }, [manageSelectionRect]);
 
   // 处理贴纸转换
   const handleStickerConvert = useCallback((imageUrl: string) => {
-    console.log('[Whiteboard] Converting image to journal-style sticker...');
-    
     if (!imageUrl) {
-      console.error('[Whiteboard] No image URL provided');
+      console.error('[Whiteboard] No image URL provided for sticker conversion');
       return;
     }
 
     const canvas = fabricCanvasRef.current;
     if (!canvas) {
-      console.error('[Whiteboard] Canvas not available');
+      console.error('[Whiteboard] Canvas not available for sticker conversion');
       return;
     }
 
@@ -530,16 +454,12 @@ const Whiteboard = ({
 
     // Close sticker button
     setStickerButtonPosition(null);
-    
-    console.log('[Whiteboard handleStickerConvert] Converting with URL:', imageUrl);
   }, [recordCanvasState]);
 
   // 处理图片上传
   const handleImageProcessed = useCallback(async (processedImage: ProcessedImage) => {
-    console.log('[Whiteboard] 图片上传处理开始');
-    
     if (!fabricCanvasRef.current || !clickPosition) {
-        console.error('[Whiteboard] Canvas或点击位置不可用');
+        console.error('[Whiteboard] Canvas or click position not available for image upload');
         return;
     }
 
@@ -552,8 +472,6 @@ const Whiteboard = ({
     const img = new Image();
     
     img.onload = () => {
-      console.log('[Whiteboard] 图片加载完成');
-      
       // 计算图片缩放比例，确保图片不会太大
       const maxSize = 250;
       const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
@@ -592,7 +510,6 @@ const Whiteboard = ({
           duration: 1400,
           onChange: () => canvas.renderAll(),
           onComplete: () => {
-            console.log('[Whiteboard] Animation completed, setting up interactions');
             fabricImage.set({ 
               selectable: true, 
               hasControls: true, 
