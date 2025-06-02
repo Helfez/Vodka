@@ -133,6 +133,7 @@
   height: 100%;
   border-radius: 14px;
   overflow: hidden;
+  z-index: 2;
 }
 
 /* 画布样式 */
@@ -142,6 +143,8 @@
   cursor: crosshair;
   border-radius: 14px;
   background: #fefcf8;
+  position: relative;
+  z-index: 3;
 }
 
 /* 手账风格的撤销按钮定位 */

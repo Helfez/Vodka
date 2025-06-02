@@ -347,7 +347,17 @@ const Whiteboard = ({
         canvasInstance.off('mouse:up', handleMouseUpLocal);
       }
     };
-  }, [width, height, initialIsDrawingMode, brushSize, brushColor, handleUndo, recordState, handleDirectImageGeneration]); // Added handleDirectImageGeneration to deps
+  }, [width, height, initialIsDrawingMode, handleUndo, recordState, handleDirectImageGeneration]); // 移除brushSize和brushColor，避免频繁重创画布
+
+  // 单独的Effect来处理画笔属性更新，避免重新创建画布
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (canvas && canvas.freeDrawingBrush) {
+      console.log('[Whiteboard BrushUpdate useEffect] Updating brush properties:', { brushSize, brushColor });
+      canvas.freeDrawingBrush.width = brushSize;
+      canvas.freeDrawingBrush.color = brushColor;
+    }
+  }, [brushSize, brushColor]);
 
   // Effect for setting the initial history
   useEffect(() => {
@@ -534,7 +544,7 @@ const Whiteboard = ({
       try {
         console.log('[Whiteboard handleImageProcessed] ✨ 应用拍立得照片效果...');
         
-        // 使用PhotoEffect创建拍立得效果
+        // 注意：PhotoEffect.applyPhotoEffect会自动添加图片到画布，所以我们不需要单独添加
         PhotoEffect.applyPhotoEffect(fabricImage, {
           animation: {
             initial: { scale: 0.7, opacity: 0, rotation: -15 },
