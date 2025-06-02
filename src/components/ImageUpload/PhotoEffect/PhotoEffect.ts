@@ -79,11 +79,15 @@ export class PhotoEffect {
     // 应用样式
     this.applyStyle(fabricImage, style);
 
-    // 设置初始状态
+    // 保存当前的缩放比例，基于此进行动画
+    const currentScaleX = fabricImage.scaleX || 1;
+    const currentScaleY = fabricImage.scaleY || 1;
+
+    // 设置初始状态 - 基于当前scale进行动画
     const randomRotation = Math.random() * 6 - 3; // -3 到 3 度的随机旋转
     fabricImage.set({
-      scaleX: animation.initial.scale,
-      scaleY: animation.initial.scale,
+      scaleX: currentScaleX * animation.initial.scale,
+      scaleY: currentScaleY * animation.initial.scale,
       opacity: animation.initial.opacity,
       angle: animation.initial.rotation + randomRotation
     });
@@ -91,10 +95,10 @@ export class PhotoEffect {
     // 添加到画布
     canvas.add(fabricImage);
 
-    // 应用动画
+    // 应用动画 - 动画到当前scale
     fabricImage.animate({
-      scaleX: animation.final.scale,
-      scaleY: animation.final.scale,
+      scaleX: currentScaleX * animation.final.scale,
+      scaleY: currentScaleY * animation.final.scale,
       opacity: animation.final.opacity,
       angle: animation.final.rotation + randomRotation
     }, {
