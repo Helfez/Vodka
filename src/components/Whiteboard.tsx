@@ -268,20 +268,23 @@ const Whiteboard = ({
     };
 
     const handlePathCreatedLocal = (e: fabric.TEvent & { path: fabric.Path }) => { 
-      // 记录当前状态到历史 - 内联函数避免依赖
-      const currentCanvas = fabricCanvasRef.current;
-      if (!currentCanvas) {
-        console.warn('[Whiteboard] Cannot record state: canvas not available');
-        return;
-      }
-      const currentState: DrawingState = {
-        canvasState: JSON.stringify(currentCanvas.toJSON()),
-        timestamp: Date.now()
-      };
-      setHistory(prev => {
-        const newHistory = [...prev, currentState].slice(-20); 
-        return newHistory;
-      });
+      // 临时禁用历史记录，测试是否setHistory导致清空问题
+      console.log('[Whiteboard] Path created, but history recording disabled for testing');
+      
+      // 注释掉历史记录逻辑
+      // const currentCanvas = fabricCanvasRef.current;
+      // if (!currentCanvas) {
+      //   console.warn('[Whiteboard] Cannot record state: canvas not available');
+      //   return;
+      // }
+      // const currentState: DrawingState = {
+      //   canvasState: JSON.stringify(currentCanvas.toJSON()),
+      //   timestamp: Date.now()
+      // };
+      // setHistory(prev => {
+      //   const newHistory = [...prev, currentState].slice(-20); 
+      //   return newHistory;
+      // });
     };
 
     const handleMouseUpLocal = (e: fabric.TEvent) => { 
