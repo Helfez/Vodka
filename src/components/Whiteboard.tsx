@@ -248,22 +248,42 @@ const Whiteboard = ({
         // 恢复画布绘图状态
         canvas.isDrawingMode = currentDrawingMode;
         if (!currentBrush) {
-          canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
+          const brush = new fabric.PencilBrush(canvas);
+          brush.width = canvas.freeDrawingBrush?.width || brushSize;
+          brush.color = canvas.freeDrawingBrush?.color || brushColor;
+          (brush as any).decimate = 8;
+          (brush as any).controlPointsNum = 2;
+          canvas.freeDrawingBrush = brush;
         } else {
           canvas.freeDrawingBrush = currentBrush;
         }
         canvas.renderAll();
 
         requestAnimationFrame(() => {
-          // 记录历史状态
-          recordCanvasState();
+          // 记录历史状态 - 内联避免依赖
+          const currentCanvas = fabricCanvasRef.current;
+          if (currentCanvas) {
+            const currentState: DrawingState = {
+              canvasState: JSON.stringify(currentCanvas.toJSON()),
+              timestamp: Date.now()
+            };
+            setHistory(prev => {
+              const newHistory = [...prev, currentState].slice(-20); 
+              return newHistory;
+            });
+          }
         });
       } catch (error) {
         console.error('[Whiteboard] 图片添加到画布失败:', error);
         // 恢复画布状态
         canvas.isDrawingMode = currentDrawingMode;
         if (!currentBrush) {
-          canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
+          const brush = new fabric.PencilBrush(canvas);
+          brush.width = canvas.freeDrawingBrush?.width || brushSize;
+          brush.color = canvas.freeDrawingBrush?.color || brushColor;
+          (brush as any).decimate = 8;
+          (brush as any).controlPointsNum = 2;
+          canvas.freeDrawingBrush = brush;
         } else {
           canvas.freeDrawingBrush = currentBrush;
         }
@@ -276,14 +296,19 @@ const Whiteboard = ({
       // 恢复画布状态
       canvas.isDrawingMode = currentDrawingMode;
       if (!currentBrush) {
-        canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
+        const brush = new fabric.PencilBrush(canvas);
+        brush.width = canvas.freeDrawingBrush?.width || brushSize;
+        brush.color = canvas.freeDrawingBrush?.color || brushColor;
+        (brush as any).decimate = 8;
+        (brush as any).controlPointsNum = 2;
+        canvas.freeDrawingBrush = brush;
       } else {
         canvas.freeDrawingBrush = currentBrush;
       }
     };
 
     img.src = imageUrl;
-  }, [clickPosition, createBrush, recordCanvasState, brushSize, brushColor]);
+  }, [clickPosition, brushSize, brushColor]);
 
   // --- Effects --- 
 
@@ -310,8 +335,13 @@ const Whiteboard = ({
     }
 
     canvasInstance.isDrawingMode = initialIsDrawingMode;
-    // 初始画笔设置 - 使用统一的createBrush函数
-    canvasInstance.freeDrawingBrush = createBrush(canvasInstance, brushSize, brushColor);
+    // 初始画笔设置 - 内联创建避免依赖
+    const brush = new fabric.PencilBrush(canvasInstance);
+    brush.width = brushSize;
+    brush.color = brushColor;
+    (brush as any).decimate = 8;
+    (brush as any).controlPointsNum = 2;
+    canvasInstance.freeDrawingBrush = brush;
     canvasInstance.renderOnAddRemove = true; 
     canvasInstance.preserveObjectStacking = true;
 
@@ -322,8 +352,20 @@ const Whiteboard = ({
     };
 
     const handlePathCreatedLocal = (e: fabric.TEvent & { path: fabric.Path }) => { 
-      // 记录当前状态到历史 - 使用统一的recordCanvasState函数
-      recordCanvasState();
+      // 记录当前状态到历史 - 内联函数避免依赖
+      const currentCanvas = fabricCanvasRef.current;
+      if (!currentCanvas) {
+        console.warn('[Whiteboard] Cannot record state: canvas not available');
+        return;
+      }
+      const currentState: DrawingState = {
+        canvasState: JSON.stringify(currentCanvas.toJSON()),
+        timestamp: Date.now()
+      };
+      setHistory(prev => {
+        const newHistory = [...prev, currentState].slice(-20); 
+        return newHistory;
+      });
     };
 
     const handleMouseUpLocal = (e: fabric.TEvent) => { 
@@ -333,17 +375,68 @@ const Whiteboard = ({
     const handleKeyboardLocal = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 'z') {
         e.preventDefault(); 
-        // 使用内联函数调用undo逻辑
-        handleUndo();
+        // 内联撤销逻辑避免依赖
+        const currentCanvas = fabricCanvasRef.current;
+        if (!currentCanvas) {
+          console.warn('[Whiteboard] Cannot undo: canvas not available');
+          return;
+        }
+
+        setHistory(prevHistory => {
+          if (prevHistory.length <= 1) { 
+            return prevHistory; 
+          }
+
+          try {
+            const prevState = prevHistory[prevHistory.length - 2]; 
+            currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
+              currentCanvas.isDrawingMode = initialIsDrawingMode; 
+              // 恢复画笔设置 - 内联创建避免依赖
+              const brush = new fabric.PencilBrush(currentCanvas);
+              brush.width = brushSize;
+              brush.color = brushColor;
+              (brush as any).decimate = 8;
+              (brush as any).controlPointsNum = 2;
+              currentCanvas.freeDrawingBrush = brush;
+              currentCanvas.renderAll();
+            });
+            return prevHistory.slice(0, -1); 
+          } catch (error) {
+            console.error('[Whiteboard] Undo failed:', error);
+            return prevHistory; 
+          }
+        });
       }
       // Ctrl/Cmd + G for the new direct image generation flow
       if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
         e.preventDefault();
-        // 生成快照并打开AI面板
-        const dataURL = generateCanvasSnapshot();
-        if (dataURL) {
+        // 内联快照生成避免依赖
+        const canvas = fabricCanvasRef.current;
+        if (!canvas) {
+          console.error('[Whiteboard] Canvas not available for snapshot');
+          return;
+        }
+        try {
+          const dataURL = canvas.toDataURL({
+            format: 'png',
+            quality: 0.8,
+            multiplier: 1,
+          });
+          
+          // Auto-download PNG
+          const link = document.createElement('a');
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          link.href = dataURL;
+          link.download = `whiteboard-snapshot-${timestamp}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
           setCanvasSnapshot(dataURL);
           setIsAIGenerationOpen(true);
+        } catch (error) {
+          console.error('[Whiteboard] Failed to generate snapshot:', error);
+          alert('无法获取画板快照，请重试');
         }
       }
     };
@@ -361,14 +454,19 @@ const Whiteboard = ({
         canvasInstance.off('mouse:up', handleMouseUpLocal);
       }
     };
-  }, [width, height, initialIsDrawingMode, createBrush, brushSize, brushColor, handleUndo, generateCanvasSnapshot, recordCanvasState]);
+  }, [width, height, initialIsDrawingMode, brushSize, brushColor]);
 
   // 单独的Effect来处理画笔属性更新，避免重新创建画布
   useEffect(() => {
     const canvas = fabricCanvasRef.current;
-    if (canvas && canvas.isDrawingMode) {
-      // 总是创建新画笔以确保属性正确应用，避免属性不同步
-      canvas.freeDrawingBrush = createBrush(canvas, brushSize, brushColor);
+    if (canvas) {
+      // 总是更新画笔属性，不管是否在绘图模式下
+      if (!canvas.freeDrawingBrush) {
+        canvas.freeDrawingBrush = createBrush(canvas, brushSize, brushColor);
+      } else {
+        canvas.freeDrawingBrush.width = brushSize;
+        canvas.freeDrawingBrush.color = brushColor;
+      }
     }
   }, [brushSize, brushColor, createBrush]);
 
@@ -495,7 +593,7 @@ const Whiteboard = ({
         // 设置canvas引用
         fabricImage.canvas = canvas;
         
-        // 应用照片效果
+        // 应用照片效果，PhotoEffect内部已经包含动画
         PhotoEffect.applyPhotoEffect(fabricImage, {
           animation: {
             initial: { scale: 0.7, opacity: 0, rotation: -15 },
@@ -505,44 +603,55 @@ const Whiteboard = ({
           }
         });
 
-        // 使用动画完成回调而不是固定timeout
-        fabricImage.animate({}, {
-          duration: 1400,
-          onChange: () => canvas.renderAll(),
-          onComplete: () => {
-            fabricImage.set({ 
-              selectable: true, 
-              hasControls: true, 
-              evented: true 
+        // 等待动画完成后设置交互性
+        setTimeout(() => {
+          fabricImage.set({ 
+            selectable: true, 
+            hasControls: true, 
+            evented: true 
+          });
+          
+          // 添加选中事件监听
+          fabricImage.on('selected', () => {
+            const bounds = fabricImage.getBoundingRect();
+            setStickerButtonPosition({
+              x: bounds.left + bounds.width / 2,
+              y: bounds.top - 20,
+              target: fabricImage
             });
-            
-            // 添加选中事件监听
-            fabricImage.on('selected', () => {
-              const bounds = fabricImage.getBoundingRect();
-              setStickerButtonPosition({
-                x: bounds.left + bounds.width / 2,
-                y: bounds.top - 20,
-                target: fabricImage
-              });
-            });
+          });
 
-            fabricImage.on('deselected', () => {
-              setStickerButtonPosition(null);
-            });
-            
-            // 恢复画布绘图状态
-            canvas.isDrawingMode = currentDrawingMode;
-            if (!currentBrush) {
-              canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
-            } else {
-              canvas.freeDrawingBrush = currentBrush;
-            }
-            canvas.renderAll();
-            
-            // 记录历史状态
-            recordCanvasState();
+          fabricImage.on('deselected', () => {
+            setStickerButtonPosition(null);
+          });
+          
+          // 恢复画布绘图状态
+          canvas.isDrawingMode = currentDrawingMode;
+          if (!currentBrush) {
+            const brush = new fabric.PencilBrush(canvas);
+            brush.width = canvas.freeDrawingBrush?.width || brushSize;
+            brush.color = canvas.freeDrawingBrush?.color || brushColor;
+            (brush as any).decimate = 8;
+            (brush as any).controlPointsNum = 2;
+            canvas.freeDrawingBrush = brush;
+          } else {
+            canvas.freeDrawingBrush = currentBrush;
           }
-        });
+          canvas.renderAll();
+          
+          // 记录历史状态 - 内联避免依赖
+          const currentCanvas = fabricCanvasRef.current;
+          if (currentCanvas) {
+            const currentState: DrawingState = {
+              canvasState: JSON.stringify(currentCanvas.toJSON()),
+              timestamp: Date.now()
+            };
+            setHistory(prev => {
+              const newHistory = [...prev, currentState].slice(-20); 
+              return newHistory;
+            });
+          }
+        }, 1500); // 稍微多于动画时间
 
       } catch (error: any) {
         console.error('[Whiteboard] 照片效果应用失败:', error);
@@ -553,14 +662,29 @@ const Whiteboard = ({
         // 恢复画笔状态
         canvas.isDrawingMode = currentDrawingMode;
         if (!currentBrush) {
-          canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
+          const brush = new fabric.PencilBrush(canvas);
+          brush.width = brushSize;
+          brush.color = brushColor;
+          (brush as any).decimate = 8;
+          (brush as any).controlPointsNum = 2;
+          canvas.freeDrawingBrush = brush;
         } else {
           canvas.freeDrawingBrush = currentBrush;
         }
         canvas.renderAll();
         
-        // 记录历史状态
-        recordCanvasState();
+        // 记录历史状态 - 内联避免依赖
+        const currentCanvas = fabricCanvasRef.current;
+        if (currentCanvas) {
+          const currentState: DrawingState = {
+            canvasState: JSON.stringify(currentCanvas.toJSON()),
+            timestamp: Date.now()
+          };
+          setHistory(prev => {
+            const newHistory = [...prev, currentState].slice(-20); 
+            return newHistory;
+          });
+        }
       }
 
       setMenuPosition(null);
@@ -572,7 +696,12 @@ const Whiteboard = ({
       // 恢复画布状态
       canvas.isDrawingMode = currentDrawingMode;
       if (!currentBrush) {
-        canvas.freeDrawingBrush = createBrush(canvas, canvas.freeDrawingBrush?.width || brushSize, canvas.freeDrawingBrush?.color || brushColor);
+        const brush = new fabric.PencilBrush(canvas);
+        brush.width = brushSize;
+        brush.color = brushColor;
+        (brush as any).decimate = 8;
+        (brush as any).controlPointsNum = 2;
+        canvas.freeDrawingBrush = brush;
       } else {
         canvas.freeDrawingBrush = currentBrush;
       }
@@ -580,7 +709,7 @@ const Whiteboard = ({
     };
 
     img.src = processedImage.dataUrl;
-  }, [clickPosition, createBrush, recordCanvasState, brushSize, brushColor]);
+  }, [clickPosition, brushSize, brushColor]);
 
   return (
     <div className="whiteboard-wrapper">
