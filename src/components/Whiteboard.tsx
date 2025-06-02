@@ -186,7 +186,7 @@ const Whiteboard = ({
 
   // Effect for initializing and managing the Fabric canvas instance
   useEffect(() => {
-    console.log('[Whiteboard CanvasLifecycle useEffect] Running. Deps:', { width, height, initialIsDrawingMode });
+    console.log('[Whiteboard CanvasLifecycle useEffect] Running. Deps:', { width, height, initialIsDrawingMode, brushSize, brushColor });
 
     if (!canvasElRef.current) {
       console.warn('[Whiteboard CanvasLifecycle useEffect] canvasElRef is null. Bailing out.');
@@ -350,7 +350,7 @@ const Whiteboard = ({
         canvasInstance.off('mouse:up', handleMouseUpLocal);
       }
     };
-  }, [width, height, initialIsDrawingMode]); // 只保留真正需要的依赖，移除recordState等函数依赖
+  }, [width, height, initialIsDrawingMode, brushSize, brushColor]); // 添加brushSize和brushColor依赖，因为undo逻辑中使用了这些变量
 
   // 单独的Effect来处理画笔属性更新，避免重新创建画布
   useEffect(() => {
