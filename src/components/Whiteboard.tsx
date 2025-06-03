@@ -4,7 +4,7 @@ import './Whiteboard.css'; // 重新启用CSS
 // import Toolbar from './Toolbar'; // 移除Toolbar
 import { AIGenerationPanel } from './AIGeneration/AIGenerationPanel';
 import { LogViewer } from './LogViewer/LogViewer';
-import { Tripo3DPanel } from './Tripo3D/Tripo3DPanel'; // 新增Tripo3D面板
+// 移除未使用的Tripo3DPanel导入
 import { ImagePanel } from './ImagePanel/ImagePanel'; // 新增图片面板
 import FloatingMenu from './FloatingMenu/FloatingMenu';
 import ImageUploader from './ImageUpload/ImageUploader';
@@ -59,10 +59,6 @@ const Whiteboard = ({
   const [showImageUploader, setShowImageUploader] = useState(false);
   const [isDrawingMode, setIsDrawingMode] = useState(true); // 添加绘图模式状态
 
-  // State for Tripo 3D generation
-  const [isTripo3DOpen, setIsTripo3DOpen] = useState(false);
-  const [tripo3DSnapshot, setTripo3DSnapshot] = useState<string>('');
-
   // State for Image Panel (右侧图片面板)
   const [isImagePanelOpen, setIsImagePanelOpen] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
@@ -90,40 +86,6 @@ const Whiteboard = ({
     console.log('🔄 [Whiteboard] Drawing mode:', newDrawingMode ? 'ON' : 'OFF');
     canvas.renderAll();
   }, [isDrawingMode]);
-
-  // 处理3D生成 - 移动到handleAIImageGenerated之前
-  const handle3DGenerateFromCanvas = useCallback(() => {
-    console.log('🎲 [handle3DGenerateFromCanvas] Generating 3D model from canvas...');
-    
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) {
-      console.error('[Whiteboard] Canvas not available for 3D generation');
-      return;
-    }
-
-    try {
-      // 生成画布快照
-      const dataURL = canvas.toDataURL({
-        format: 'png',
-        quality: 0.8,
-        multiplier: 1
-      });
-      
-      setTripo3DSnapshot(dataURL);
-      setIsTripo3DOpen(true);
-      
-      console.log('✅ [handle3DGenerateFromCanvas] Canvas snapshot created, opening 3D panel');
-    } catch (error) {
-      console.error('❌ [handle3DGenerateFromCanvas] Canvas导出失败:', error);
-      
-      if (error instanceof DOMException && error.name === 'SecurityError') {
-        alert('由于图片跨域限制，无法生成3D模型。请使用本地上传的图片或重新绘制。');
-        console.error('❌ Canvas被污染，可能包含跨域图片');
-      } else {
-        alert('画布导出失败，请重试');
-      }
-    }
-  }, []);
 
   // --- Callbacks ---
 
@@ -386,12 +348,6 @@ const Whiteboard = ({
     setFloatingMenuPosition(null); // 关闭菜单
   }, [floatingMenuPosition]);
 
-  // 处理3D模型生成完成
-  const handle3DModelGenerated = useCallback((modelUrl: string, format: string) => {
-    console.log('🎉 [handle3DModelGenerated] 3D model generated:', modelUrl, format);
-    // 这里可以添加后续处理，比如将模型添加到画布或显示预览
-  }, []);
-
   // 处理从ImagePanel拖拽图片到Canvas
   const handleImageDragToCanvas = useCallback((imageUrl: string, x?: number, y?: number) => {
     console.log('🖼️ [handleImageDragToCanvas] 添加图片到画板:', imageUrl.substring(0, 50) + '...');
@@ -601,12 +557,12 @@ const Whiteboard = ({
         />
       )}
 
-      {/* Tripo 3D生成面板 */}
-      <Tripo3DPanel
-        isOpen={isTripo3DOpen}
-        onClose={() => setIsTripo3DOpen(false)}
-        canvasSnapshot={tripo3DSnapshot}
-        onModelGenerated={handle3DModelGenerated}
+      {/* 右侧图片面板 */}
+      <ImagePanel
+        isOpen={isImagePanelOpen}
+        generatedImages={generatedImages}
+        onImageDragToCanvas={handleImageDragToCanvas}
+        onClose={() => setIsImagePanelOpen(false)}
       />
 
       {/* 图片上传器 */}
@@ -620,14 +576,6 @@ const Whiteboard = ({
           }}
         </ImageUploader>
       )}
-
-      {/* 右侧图片面板 */}
-      <ImagePanel
-        isOpen={isImagePanelOpen}
-        generatedImages={generatedImages}
-        onImageDragToCanvas={handleImageDragToCanvas}
-        onClose={() => setIsImagePanelOpen(false)}
-      />
     </div>
   );
 };
