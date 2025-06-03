@@ -99,63 +99,17 @@ export default async (request, context) => {
         });
     }
 
-    const { imageBase64, options } = taskDataFromBlob;
+    const { imageUrl, options } = taskDataFromBlob;
     
     try {
         console.log(`[tripo-process-background] 🎨 任务 ${taskId}: 调用Tripo API开始`);
+        console.log(`  - 图片URL: ${imageUrl}`);
         console.log(`  - 输出格式: ${options.outputFormat}`);
         console.log(`  - 移除背景: ${options.removeBackground}`);
         console.log(`  - 网格分辨率: ${options.mcResolution}`);
 
-        // 第一步：上传图片获取file_token
-        console.log(`[tripo-process-background] 📤 任务 ${taskId}: 第一步 - 上传图片`);
-        
-        // 解析base64数据
-        let base64Data;
-        if (imageBase64.startsWith('data:')) {
-            base64Data = imageBase64.split(',')[1];
-        } else {
-            base64Data = imageBase64;
-        }
-        
-        // 将base64转换为Buffer
-        const imageBuffer = Buffer.from(base64Data, 'base64');
-        
-        // 创建FormData上传图片
-        const FormData = (await import('form-data')).default;
-        const formData = new FormData();
-        formData.append('file', imageBuffer, {
-            filename: 'image.png',
-            contentType: 'image/png'
-        });
-
-        const uploadResponse = await fetch('https://api.tripo3d.ai/v2/openapi/upload', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${tripoApiKey}`,
-                ...formData.getHeaders()
-            },
-            body: formData
-        });
-
-        if (!uploadResponse.ok) {
-            const errorText = await uploadResponse.text();
-            console.error(`[tripo-process-background] ❌ 图片上传失败:`, uploadResponse.status, errorText);
-            throw new Error(`图片上传失败: ${uploadResponse.status} ${errorText}`);
-        }
-
-        const uploadResult = await uploadResponse.json();
-        console.log(`[tripo-process-background] ✅ 任务 ${taskId}: 图片上传成功`);
-
-        if (uploadResult.code !== 0 || !uploadResult.data?.image_token) {
-            throw new Error(`图片上传失败: ${uploadResult.message || '未获取到image_token'}`);
-        }
-
-        const fileToken = uploadResult.data.image_token;
-        console.log(`[tripo-process-background] 📋 任务 ${taskId}: 获得file_token: ${fileToken.substring(0, 20)}...`);
-
-        // 第二步：创建3D生成任务
-        console.log(`[tripo-process-background] 🚀 任务 ${taskId}: 第二步 - 创建3D生成任务`);
+        // 直接调用Tripo3D API，传递HTTP URL
+        console.log(`[tripo-process-background] 🚀 任务 ${taskId}: 直接调用Tripo3D Generation API`);
 
         const taskResponse = await fetch('https://api.tripo3d.ai/v2/openapi/task', {
             method: 'POST',
@@ -166,8 +120,8 @@ export default async (request, context) => {
             body: JSON.stringify({
                 type: 'image_to_model',
                 file: {
-                    type: 'png',
-                    file_token: fileToken
+                    type: 'url',
+                    url: imageUrl // 直接传递HTTP URL
                 },
                 model_version: 'v2.5-20240919',
                 texture: true,
@@ -193,8 +147,8 @@ export default async (request, context) => {
         const tripoTaskId = taskResult.data.task_id;
         console.log(`[tripo-process-background] 📋 任务 ${taskId}: Tripo任务ID: ${tripoTaskId}`);
 
-        // 第三步：WebSocket监听任务状态
-        console.log(`[tripo-process-background] 🔄 任务 ${taskId}: 第三步 - WebSocket监听任务状态`);
+        // WebSocket监听任务状态
+        console.log(`[tripo-process-background] 🔄 任务 ${taskId}: WebSocket监听任务状态`);
         
         const WebSocket = (await import('ws')).default;
         const wsUrl = `wss://api.tripo3d.ai/v2/openapi/task/watch/${tripoTaskId}`;
@@ -277,7 +231,7 @@ export default async (request, context) => {
             completedAt: new Date().toISOString(),
             tripoResponse: {
                 taskId: tripoTaskId,
-                fileToken: fileToken
+                fileToken: ''
             }
         });
 

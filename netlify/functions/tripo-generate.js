@@ -34,7 +34,7 @@ export default async (request, context) => {
         const bodyText = await request.text();
         requestBody = JSON.parse(bodyText);
         console.log('[tripo-generate] 📋 请求参数:', {
-            hasImage: !!requestBody.imageBase64,
+            hasImage: !!requestBody.imageUrl,
             outputFormat: requestBody.outputFormat,
             removeBackground: requestBody.removeBackground,
             mcResolution: requestBody.mcResolution
@@ -48,7 +48,7 @@ export default async (request, context) => {
     }
 
     const { 
-        imageBase64,
+        imageUrl,
         outputFormat = 'glb',
         removeBackground = true,
         foregroundRatio = 0.9,
@@ -56,9 +56,9 @@ export default async (request, context) => {
     } = requestBody;
 
     // 验证参数
-    if (!imageBase64) {
-        console.error('[tripo-generate] ❌ 缺少imageBase64参数');
-        return new Response(JSON.stringify({ error: '需要提供图像Base64编码 (imageBase64)' }), {
+    if (!imageUrl) {
+        console.error('[tripo-generate] ❌ 缺少imageUrl参数');
+        return new Response(JSON.stringify({ error: '需要提供图像URL (imageUrl)' }), {
             status: 400,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -84,7 +84,7 @@ export default async (request, context) => {
         taskId,
         status: 'pending',
         createdAt: new Date().toISOString(),
-        imageBase64,
+        imageUrl,
         options: {
             outputFormat,
             removeBackground,
@@ -147,4 +147,4 @@ export default async (request, context) => {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
-}; 
+};                                          

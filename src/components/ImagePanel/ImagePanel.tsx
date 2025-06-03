@@ -54,18 +54,8 @@ export const ImagePanel: React.FC<ImagePanelProps> = ({
     try {
       console.log('🎲 [ImagePanel] 开始生成3D模型:', imageUrl);
 
-      // 将图片URL转换为base64（如果需要）
-      let imageBase64 = imageUrl;
-      if (!imageUrl.startsWith('data:')) {
-        // 如果是URL，需要先获取图片数据
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        imageBase64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      }
+      // 直接传递图片URL，不进行base64转换
+      console.log('🎲 [ImagePanel] 直接使用图片URL，避免base64转换');
 
       const tripoService = TripoService.getInstance();
       
@@ -79,9 +69,9 @@ export const ImagePanel: React.FC<ImagePanelProps> = ({
         }));
       };
 
-      // 开始生成
+      // 开始生成 - 直接传递imageUrl而不是转换后的base64
       const result = await tripoService.imageToModel(
-        imageBase64,
+        imageUrl, // 直接传递HTTP URL
         {
           outputFormat: 'glb',
           removeBackground: true,

@@ -21,13 +21,13 @@ export class TripoService {
 
   /**
    * 将图片转换为3D模型
-   * @param imageBase64 图片的base64编码
+   * @param imageUrl 图片的HTTP URL
    * @param options 生成选项
    * @param onProgress 进度回调
    * @returns 3D模型文件URL
    */
   async imageToModel(
-    imageBase64: string,
+    imageUrl: string,
     options: {
       outputFormat?: 'glb' | 'obj';
       removeBackground?: boolean;
@@ -52,7 +52,7 @@ export class TripoService {
       };
 
       console.log('[TripoService imageToModel] 📋 生成参数:');
-      console.log('  - 图片大小:', Math.round(imageBase64.length / 1024), 'KB');
+      console.log('  - 图片URL:', imageUrl);
       console.log('  - 输出格式:', finalOptions.outputFormat);
       console.log('  - 移除背景:', finalOptions.removeBackground);
       console.log('  - 前景比例:', finalOptions.foregroundRatio);
@@ -70,7 +70,7 @@ export class TripoService {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          imageBase64,
+          imageUrl, // 直接传递HTTP URL
           ...finalOptions
         }),
       });
