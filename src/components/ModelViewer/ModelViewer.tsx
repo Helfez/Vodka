@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { WANGWANG_CONFIG, openWangwangChat, replaceMessageTemplate } from '../../config/wangwang.config';
 import './ModelViewer.css';
 
 interface ModelViewerProps {
@@ -274,6 +275,39 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
     }
   };
 
+  // 制作手办 - 跳转到阿里旺旺
+  const handleMakeHandicraft = async () => {
+    try {
+      console.log('[ModelViewer] 🎨 开始制作手办流程...');
+      
+      // 构造消息变量
+      const messageVariables = {
+        modelName: modelName || '3D模型',
+        modelFormat: modelFormat.toUpperCase(),
+        fileName: `${modelName || '3d-model'}.${modelFormat}`,
+        modelUrl: modelUrl || '暂无链接'
+      };
+      
+      // 使用模板生成消息
+      const message = replaceMessageTemplate(
+        WANGWANG_CONFIG.messageTemplates.handicraft,
+        messageVariables
+      );
+      
+      console.log('[ModelViewer] 📝 手办定制消息:', message);
+      
+      // 打开阿里旺旺聊天窗口
+      await openWangwangChat(message, {
+        showFallbackDialog: true,
+        fallbackDelay: 2000
+      });
+      
+    } catch (error) {
+      console.error('[ModelViewer] ❌ 制作手办流程失败:', error);
+      alert(`打开客服聊天失败：${error instanceof Error ? error.message : '未知错误'}\n\n您也可以直接联系：\n电话：${WANGWANG_CONFIG.fallbackContacts.phone}\nQQ：${WANGWANG_CONFIG.fallbackContacts.qq}`);
+    }
+  };
+
   // 组件挂载时初始化
   useEffect(() => {
     if (isOpen && mountRef.current) {
@@ -381,6 +415,13 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
                     🖼️ 查看预览图
                   </button>
                 )}
+                <button 
+                  className="handicraft-btn"
+                  onClick={handleMakeHandicraft}
+                  title="联系客服定制手办"
+                >
+                  🎨 制作手办
+                </button>
               </div>
             </div>
 
