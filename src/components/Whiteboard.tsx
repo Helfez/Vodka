@@ -140,13 +140,13 @@ const Whiteboard = ({
       fabricCanvasRef.current = null;
     }
 
-    // 创建新的 Fabric.js 画布实例
+    // 创建新的 Fabric.js 画布实例 - 最简配置
     const canvasInstance = new fabric.Canvas(canvasElRef.current, {
-      width,
-      height,
+        width,
+        height,
       backgroundColor: '#fefcf8',
-      isDrawingMode: initialIsDrawingMode,
-    }) as FabricCanvas;
+        isDrawingMode: true, // 直接启用绘图模式
+      }) as FabricCanvas;
 
     // 🔧 强制设置DOM canvas元素尺寸，确保与Fabric实例匹配
     if (canvasElRef.current) {
@@ -157,102 +157,34 @@ const Whiteboard = ({
       console.log('🔧 [Whiteboard] Forced DOM canvas size to match Fabric:', width, 'x', height);
     }
 
-    // 设置画笔 - 使用固定初始值，避免依赖状态变量
+    // 设置画笔 - 最简配置
     const brush = new fabric.PencilBrush(canvasInstance);
-    brush.width = 5; // 固定初始值
-    brush.color = '#000000'; // 固定初始值
-    // 🔧 移除可能导致问题的高级属性
-    // (brush as any).decimate = 8;
-    // (brush as any).controlPointsNum = 2;
+    brush.width = 5;
+    brush.color = '#000000';
     canvasInstance.freeDrawingBrush = brush;
     
-    // 设置canvas属性
-    canvasInstance.renderOnAddRemove = true;
-    canvasInstance.preserveObjectStacking = true;
-    
-    // 🔧 尝试强制设置更简单的画笔模式
-    canvasInstance.isDrawingMode = true;
-    canvasInstance.freeDrawingBrush.width = 5;
-    canvasInstance.freeDrawingBrush.color = '#000000';
-
-    // 路径创建事件 - 关键的绘制完成LOG
-    const handlePathCreated = (e: fabric.TEvent & { path: fabric.Path }) => {
-      console.log('🎯 [Whiteboard] PATH CREATED - Objects:', canvasInstance.getObjects().length);
-      
-      // 🔧 简单方案：只做强制渲染，不清空canvas
-      canvasInstance.renderAll();
-      console.log('✅ [Whiteboard] Simple render completed');
-    };
-
-    // 对象添加事件
-    const handleObjectAdded = (e: fabric.TEvent & { target: fabric.Object }) => {
-      console.log('➕ [Whiteboard] Object ADDED:', e.target.type, 'Total:', canvasInstance.getObjects().length);
-    };
-
-    // 对象移除事件 - 关键的消失监控
-    const handleObjectRemoved = (e: fabric.TEvent & { target: fabric.Object }) => {
-      console.log('➖ [Whiteboard] Object REMOVED:', e.target.type, 'Remaining:', canvasInstance.getObjects().length);
-    };
-
-    // 画布清空事件 - 这是导致绘制消失的主要原因
-    const handleCanvasCleared = () => {
-      console.log('🧹 [Whiteboard] CANVAS CLEARED!');
-    };
-
-    // 绑定所有事件监听器
-    console.log('🔗 [Whiteboard] Binding essential event listeners only');
-    
-    // 🔧 只绑定最关键的事件，减少冲突
-    canvasInstance.on('path:created', handlePathCreated);
-    canvasInstance.on('object:added', handleObjectAdded);
-    canvasInstance.on('object:removed', handleObjectRemoved);
-    canvasInstance.on('canvas:cleared', handleCanvasCleared);
-    
-    // 🔧 暂时移除可能冲突的事件监听器
-    // canvasInstance.on('mouse:down', handleMouseDown);
-    // canvasInstance.on('mouse:up', handleMouseUp);
-    // canvasInstance.on('before:path:created', handleDrawingStart);
-    
-    console.log('✅ [Whiteboard] Essential events bound successfully');
+    // 🔧 移除所有事件监听器，只保留基本功能
+    console.log('✅ [Whiteboard] Minimal canvas setup completed');
 
     fabricCanvasRef.current = canvasInstance;
     
-    console.log('✅ [Whiteboard] Canvas initialization completed successfully');
-    console.log('📐 [Whiteboard] Canvas size:', canvasInstance.getWidth(), 'x', canvasInstance.getHeight());
-    console.log('📐 [Whiteboard] Expected size:', width, 'x', height);
-
-    // 清理函数
+    // 简化的清理函数
     return () => {
       console.log('🧹 [Whiteboard] Cleaning up canvas');
-      
       if (canvasInstance && fabricCanvasRef.current === canvasInstance) {
-        // 移除所有事件监听器
-        canvasInstance.off('path:created', handlePathCreated);
-        canvasInstance.off('object:added', handleObjectAdded);
-        canvasInstance.off('object:removed', handleObjectRemoved);
-        canvasInstance.off('canvas:cleared', handleCanvasCleared);
-        
         canvasInstance.dispose();
         fabricCanvasRef.current = null;
       }
     };
-  }, [width, height, initialIsDrawingMode]); // 🔧 修复：只依赖canvas尺寸和绘图模式，画笔属性通过单独Effect更新
-
-  // 🔧 画笔更新Effect - 暂时禁用来测试
-  useEffect(() => {
-    console.log('🖌️ [Whiteboard] Brush update effect triggered - Size:', brushSize, 'Color:', brushColor);
-    
-    // 🚨 暂时禁用画笔更新来排查是否它导致清空
-    console.log('⚠️ [Whiteboard] BRUSH UPDATE DISABLED FOR TESTING');
-    return;
-  }, [brushSize, brushColor]); // 只依赖画笔属性，不会导致canvas重建
+  }, [width, height]); // 只依赖尺寸变化
 
   return (
     <div className="whiteboard-wrapper">
-      <Toolbar 
+      {/* 暂时移除Toolbar来排除状态变化问题 */}
+      {/* <Toolbar 
         brushSize={brushSize}
         onBrushSizeChange={handleBrushSizeChange}
-      />
+      /> */}
       
       <div className="ai-generation-trigger">
         <button
