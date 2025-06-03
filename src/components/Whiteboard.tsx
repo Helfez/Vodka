@@ -129,14 +129,21 @@ const Whiteboard = ({
 
   // 处理图片上传
   const handleImageUploaded = useCallback((processedImage: ProcessedImage) => {
+    console.log('🖼️ [handleImageUploaded] Processing image:', processedImage);
+    
     const canvas = fabricCanvasRef.current;
     if (!canvas) {
       console.error('[Whiteboard] Canvas not available for image upload');
       return;
     }
 
+    console.log('🎯 [handleImageUploaded] Canvas found:', canvas);
+
     const img = new Image();
+    
     img.onload = () => {
+      console.log('✅ [handleImageUploaded] Image loaded successfully:', img.width, 'x', img.height);
+      
       // 计算canvas坐标：如果有右键位置，转换为canvas坐标
       let canvasX = 100;
       let canvasY = 100;
@@ -145,6 +152,7 @@ const Whiteboard = ({
         const rect = canvasElRef.current.getBoundingClientRect();
         canvasX = floatingMenuPosition.x - rect.left;
         canvasY = floatingMenuPosition.y - rect.top;
+        console.log('📍 [handleImageUploaded] Calculated canvas position:', canvasX, canvasY);
       }
 
       const fabricImage = new fabric.Image(img, {
@@ -157,12 +165,45 @@ const Whiteboard = ({
         evented: true
       });
 
-      // 应用拍立得特效
-      PhotoEffect.applyPhotoEffect(fabricImage);
-      canvas.renderAll();
+      console.log('🎨 [handleImageUploaded] FabricImage created:', fabricImage);
+
+      try {
+        // 先将图片添加到canvas，这样PhotoEffect才能获取到canvas
+        console.log('📌 [handleImageUploaded] Adding image to canvas first...');
+        canvas.add(fabricImage);
+        console.log('✅ [handleImageUploaded] Image added to canvas');
+        
+        // 然后应用拍立得特效
+        console.log('✨ [handleImageUploaded] Applying PhotoEffect...');
+        PhotoEffect.applyPhotoEffect(fabricImage);
+        console.log('✅ [handleImageUploaded] PhotoEffect applied successfully');
+        
+        canvas.renderAll();
+        console.log('🖌️ [handleImageUploaded] Canvas rendered');
+        
+        // 检查canvas中的对象数量
+        console.log('📊 [handleImageUploaded] Canvas objects count:', canvas.getObjects().length);
+        
+      } catch (error) {
+        console.error('❌ [handleImageUploaded] PhotoEffect error:', error);
+        
+        // 如果PhotoEffect失败，确保图片至少被添加了
+        console.log('🔄 [handleImageUploaded] Fallback: ensuring image is in canvas');
+        if (canvas.getObjects().indexOf(fabricImage) === -1) {
+          canvas.add(fabricImage);
+        }
+        canvas.renderAll();
+      }
     };
 
+    img.onerror = (error) => {
+      console.error('❌ [handleImageUploaded] Image load failed:', error);
+      console.error('❌ [handleImageUploaded] Failed dataUrl:', processedImage.dataUrl.substring(0, 100) + '...');
+    };
+
+    console.log('📥 [handleImageUploaded] Setting image src...');
     img.src = processedImage.dataUrl;
+    
     setFloatingMenuPosition(null); // 关闭菜单
     setShowImageUploader(false); // 关闭上传器
   }, [floatingMenuPosition]);
