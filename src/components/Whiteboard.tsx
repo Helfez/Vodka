@@ -1,27 +1,13 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
 import './Whiteboard.css';
 import Toolbar from './Toolbar';
-import UndoButton from './UndoButton';
-import FloatingMenu from './FloatingMenu/FloatingMenu';
-import ImageUploader from './ImageUpload/ImageUploader';
-import { ProcessedImage } from './ImageUpload/ImageProcessor';
-import { PhotoEffect } from './ImageUpload/PhotoEffect/PhotoEffect';
-import { FloatingButton } from './ImageSticker/components/FloatingButton';
-import { FloatingButtonPosition } from './ImageSticker/services/types';
-import { LogViewer } from './LogViewer/LogViewer';
 import { AIGenerationPanel } from './AIGeneration/AIGenerationPanel';
+import { LogViewer } from './LogViewer/LogViewer';
 
 // Type alias for Fabric.js Canvas instance with custom properties if any
-// (Currently, freeDrawingBrush is a standard property but explicitly typed for clarity)
 interface FabricCanvas extends fabric.Canvas {
   freeDrawingBrush?: fabric.PencilBrush;
-}
-
-// Interface for storing a snapshot of the canvas state for history
-interface DrawingState {
-  canvasState: string; // JSON string representation of canvas objects
-  timestamp: number;   // Timestamp of when the state was saved
 }
 
 // Props for the Whiteboard component
@@ -42,15 +28,9 @@ const Whiteboard = ({
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
 
   // State for UI elements and drawing properties
-  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
-  const [clickPosition, setClickPosition] = useState<{ x: number; y: number } | null>(null);
   const [brushSize, setBrushSize] = useState(5);
   const [brushColor, setBrushColor] = useState('#000000');
-  const [history, setHistory] = useState<DrawingState[]>([]);
   
-  // State for sticker button visibility and position
-  const [stickerButtonPosition, setStickerButtonPosition] = useState<FloatingButtonPosition | null>(null);
-
   // State for AI generation panel - isAIGenerationOpen might not be needed if panel is fully replaced
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isAIGenerationOpen, setIsAIGenerationOpen] = useState(false); 
@@ -71,191 +51,124 @@ const Whiteboard = ({
 
   // --- Callbacks ---
 
-  // 处理画笔大小变化
+  // Handler for brush size changes
   const handleBrushSizeChange = useCallback((newSize: number) => {
     setBrushSize(newSize);
-    const canvas = fabricCanvasRef.current;
-    if (canvas?.freeDrawingBrush) {
-      canvas.freeDrawingBrush.width = newSize;
-    }
   }, []);
 
-  // 处理画笔颜色变化 - 为未来功能预留
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleBrushColorChange = useCallback((newColor: string) => {
-    setBrushColor(newColor);
-    const canvas = fabricCanvasRef.current;
-    if (canvas?.freeDrawingBrush) {
-      canvas.freeDrawingBrush.color = newColor;
-    }
-  }, []);
-
-  // 处理AI生成面板打开
-  const handleOpenAIPanel = useCallback(() => {
-    // 内联快照生成
+  // 清空画布函数
+  const clearCanvas = useCallback(() => {
     const canvas = fabricCanvasRef.current;
     if (!canvas) {
-      console.error('[Whiteboard] Canvas not available for snapshot');
+      console.warn('[Whiteboard] Cannot clear: canvas not available');
       return;
     }
-    try {
-      const dataURL = canvas.toDataURL({
-        format: 'png',
-        quality: 0.8,
-        multiplier: 1,
-      });
-      
-      // Auto-download PNG
-      const link = document.createElement('a');
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      link.href = dataURL;
-      link.download = `whiteboard-snapshot-${timestamp}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      setCanvasSnapshot(dataURL);
-      setIsAIGenerationOpen(true);
-    } catch (error) {
-      console.error('[Whiteboard] Failed to generate snapshot:', error);
-      alert('无法获取画板快照，请重试');
+
+    console.log('🧹 [Whiteboard] Clearing canvas manually');
+    canvas.clear();
+    
+    // 重新设置画布的绘图模式和画笔
+    canvas.isDrawingMode = initialIsDrawingMode;
+    const brush = new fabric.PencilBrush(canvas);
+    brush.width = brushSize;
+    brush.color = brushColor;
+    (brush as any).decimate = 8;
+    (brush as any).controlPointsNum = 2;
+    canvas.freeDrawingBrush = brush;
+    canvas.renderAll();
+  }, [initialIsDrawingMode, brushSize, brushColor]);
+
+  // AI生成面板处理
+  const handleOpenAIPanel = useCallback(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) {
+      console.error('[Whiteboard] Canvas not available for AI generation');
+      return;
     }
+
+    // 生成画布快照
+    const dataURL = canvas.toDataURL({
+      format: 'png',
+      quality: 0.8,
+      multiplier: 1
+    });
+    
+    setCanvasSnapshot(dataURL);
+    setIsAIGenerationOpen(true);
   }, []);
 
   // 处理AI生成的图片
-  const handleAIImageGenerated = useCallback((imageUrl: string) => {
+  const handleAIImageGenerated = useCallback((imageDataUrl: string) => {
     const canvas = fabricCanvasRef.current;
     if (!canvas) {
-      console.error('[Whiteboard] Canvas不可用，无法添加图片');
+      console.error('[Whiteboard] Canvas not available for AI image insertion');
       return;
     }
 
-    // 保存当前画布状态
-    const currentDrawingMode = canvas.isDrawingMode;
-    const currentBrush = canvas.freeDrawingBrush;
-
     const img = new Image();
-    img.crossOrigin = 'anonymous';
-    
     img.onload = () => {
-      try {
-        const canvasCenter = {
-          x: canvas.getWidth() / 2,
-          y: canvas.getHeight() / 2
-        };
-        const imagePosition = {
-          x: clickPosition?.x || canvasCenter.x - img.width / 4,
-          y: clickPosition?.y || canvasCenter.y - img.height / 4
-        };
+      // 计算图片位置（居中放置）
+      const canvasCenter = {
+        x: canvas.width! / 2,
+        y: canvas.height! / 2
+      };
 
-        const fabricImage = new fabric.Image(img, {
-          left: imagePosition.x,
-          top: imagePosition.y,
-          scaleX: 0.5,
-          scaleY: 0.5,
-          selectable: true,
-          hasControls: true,
-          evented: true
-        });
+      // 计算适当的缩放比例
+      const maxSize = Math.min(canvas.width! * 0.6, canvas.height! * 0.6);
+      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
 
-        canvas.add(fabricImage);
-        canvas.setActiveObject(fabricImage);
-        
-        // 恢复画布绘图状态
-        canvas.isDrawingMode = currentDrawingMode;
-        if (!currentBrush) {
-          const brush = new fabric.PencilBrush(canvas);
-          brush.width = canvas.freeDrawingBrush?.width || brushSize;
-          brush.color = canvas.freeDrawingBrush?.color || brushColor;
-          (brush as any).decimate = 8;
-          (brush as any).controlPointsNum = 2;
-          canvas.freeDrawingBrush = brush;
-        } else {
-          canvas.freeDrawingBrush = currentBrush;
-        }
-        canvas.renderAll();
+      const fabricImage = new fabric.Image(img, {
+        left: canvasCenter.x - (img.width * scale) / 2,
+        top: canvasCenter.y - (img.height * scale) / 2,
+        scaleX: scale,
+        scaleY: scale,
+        selectable: true,
+        hasControls: true,
+        evented: true
+      });
 
-        requestAnimationFrame(() => {
-          // 记录历史状态 - 内联避免依赖
-          const currentCanvas = fabricCanvasRef.current;
-          if (currentCanvas) {
-            const currentState: DrawingState = {
-              canvasState: JSON.stringify(currentCanvas.toJSON()),
-              timestamp: Date.now()
-            };
-            setHistory(prev => {
-              const newHistory = [...prev, currentState].slice(-20); 
-              return newHistory;
-            });
-          }
-        });
-      } catch (error) {
-        console.error('[Whiteboard] 图片添加到画布失败:', error);
-        // 恢复画布状态
-        canvas.isDrawingMode = currentDrawingMode;
-        if (!currentBrush) {
-          const brush = new fabric.PencilBrush(canvas);
-          brush.width = canvas.freeDrawingBrush?.width || brushSize;
-          brush.color = canvas.freeDrawingBrush?.color || brushColor;
-          (brush as any).decimate = 8;
-          (brush as any).controlPointsNum = 2;
-          canvas.freeDrawingBrush = brush;
-        } else {
-          canvas.freeDrawingBrush = currentBrush;
-        }
-        canvas.renderAll();
-      }
+      canvas.add(fabricImage);
+      canvas.renderAll();
     };
 
-    img.onerror = (errorEvent) => {
-      console.error('[Whiteboard] 图片加载失败:', errorEvent);
-      // 恢复画布状态
-      canvas.isDrawingMode = currentDrawingMode;
-      if (!currentBrush) {
-        const brush = new fabric.PencilBrush(canvas);
-        brush.width = canvas.freeDrawingBrush?.width || brushSize;
-        brush.color = canvas.freeDrawingBrush?.color || brushColor;
-        (brush as any).decimate = 8;
-        (brush as any).controlPointsNum = 2;
-        canvas.freeDrawingBrush = brush;
-      } else {
-        canvas.freeDrawingBrush = currentBrush;
-      }
+    img.onerror = () => {
+      console.error('[Whiteboard] Failed to load AI generated image');
+      alert('生成的图片加载失败，请重试');
     };
 
-    img.src = imageUrl;
-  }, [clickPosition, brushSize, brushColor]);
+    img.src = imageDataUrl;
+  }, []);
 
   // --- Effects --- 
 
   // Effect for initializing and managing the Fabric canvas instance
   useEffect(() => {
-    console.log('🎨 [Whiteboard] Canvas initialization effect triggered');
+    console.log('🚀 [Whiteboard] Initializing canvas with dimensions:', width, 'x', height);
     
     if (!canvasElRef.current) {
-      console.warn('❌ [Whiteboard] Canvas element not available');
+      console.error('[Whiteboard] Canvas element not found');
       return;
     }
 
-    // 防止重复初始化 - 只在首次挂载时创建
+    // 如果已存在canvas实例，先清理
     if (fabricCanvasRef.current) {
-      console.log('✅ [Whiteboard] Canvas already exists, skipping initialization');
-      return;
+      console.log('🧹 [Whiteboard] Disposing existing canvas instance');
+      fabricCanvasRef.current.dispose();
+      fabricCanvasRef.current = null;
     }
 
-    console.log('🚀 [Whiteboard] Creating new canvas instance');
+    // 创建新的 Fabric.js 画布实例
     const canvasInstance = new fabric.Canvas(canvasElRef.current, {
       width,
       height,
-      backgroundColor: '#ffffff',
+      backgroundColor: '#fefcf8',
       isDrawingMode: initialIsDrawingMode,
     }) as FabricCanvas;
 
-    // 初始画笔设置 - 使用初始固定值，后续通过另一个effect更新
-    console.log('🖌️ [Whiteboard] Setting up initial brush');
+    // 设置画笔
     const brush = new fabric.PencilBrush(canvasInstance);
-    brush.width = 5; // 初始固定值
-    brush.color = '#000000'; // 初始固定值
+    brush.width = brushSize;
+    brush.color = brushColor;
     (brush as any).decimate = 8;
     (brush as any).controlPointsNum = 2;
     canvasInstance.freeDrawingBrush = brush;
@@ -318,9 +231,6 @@ const Whiteboard = ({
     // 鼠标按下事件
     const handleMouseDown = (e: any) => {
       console.log('🖱️ [Whiteboard] Mouse DOWN at:', e.pointer);
-      if (canvasInstance.isDrawingMode) {
-        setStickerButtonPosition(null);
-      }
     };
 
     // 鼠标释放事件
@@ -340,16 +250,59 @@ const Whiteboard = ({
     // 绘制相关事件 - 修复事件绑定
     canvasInstance.on('before:path:created', handleDrawingStart);
 
-    // 键盘事件处理
-    const handleKeyboard = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'z') {
-        e.preventDefault();
-        console.log('↩️ [Whiteboard] Undo triggered');
-        // 撤销逻辑保持不变...
+    // 🔍 添加更多监控事件
+    canvasInstance.on('before:render', () => {
+      console.log('🎨 [Whiteboard] Canvas BEFORE render, objects:', canvasInstance.getObjects().length);
+    });
+
+    canvasInstance.on('after:render', () => {
+      const objectCount = canvasInstance.getObjects().length;
+      console.log('🎨 [Whiteboard] Canvas AFTER render, objects:', objectCount);
+      if (objectCount === 0) {
+        console.error('🚨 [Whiteboard] RENDER CLEARED ALL OBJECTS!');
+        console.trace('📍 [Whiteboard] Render clear stack trace');
       }
+    });
+
+    // 🔍 监控画布状态变化
+    const originalClear = canvasInstance.clear.bind(canvasInstance);
+    canvasInstance.clear = function(...args) {
+      console.error('🚨 [Whiteboard] CANVAS.CLEAR() CALLED!');
+      console.trace('📍 [Whiteboard] Clear method stack trace');
+      return originalClear(...args);
     };
 
-    window.addEventListener('keydown', handleKeyboard);
+    // 🔍 监控loadFromJSON调用
+    const originalLoadFromJSON = canvasInstance.loadFromJSON.bind(canvasInstance);
+    canvasInstance.loadFromJSON = function(json, callback, ...args) {
+      console.log('📥 [Whiteboard] LOAD_FROM_JSON called');
+      console.trace('📍 [Whiteboard] LoadFromJSON stack trace');
+      return originalLoadFromJSON(json, callback, ...args);
+    };
+
+    // 🔍 监控画布大小变化
+    const originalSetDimensions = canvasInstance.setDimensions.bind(canvasInstance);
+    canvasInstance.setDimensions = function(dimensions: any, options?: any) {
+      console.log('📐 [Whiteboard] CANVAS SIZE CHANGE:', dimensions);
+      const beforeCount = canvasInstance.getObjects().length;
+      const result = originalSetDimensions(dimensions, options);
+      const afterCount = canvasInstance.getObjects().length;
+      if (beforeCount !== afterCount) {
+        console.error('🚨 [Whiteboard] SIZE CHANGE CLEARED OBJECTS!', beforeCount, '->', afterCount);
+      }
+      return result;
+    };
+
+    // 🔍 定期检查画布状态
+    const statusChecker = setInterval(() => {
+      const objectCount = canvasInstance.getObjects().length;
+      console.log('⏰ [Whiteboard] Periodic check - Objects:', objectCount, 'Timestamp:', new Date().toLocaleTimeString());
+      
+      if (objectCount === 0) {
+        console.warn('⚠️ [Whiteboard] Periodic check found EMPTY canvas!');
+      }
+    }, 3000); // 每3秒检查一次
+
     fabricCanvasRef.current = canvasInstance;
     
     console.log('✅ [Whiteboard] Canvas initialization completed successfully');
@@ -357,7 +310,7 @@ const Whiteboard = ({
     // 清理函数
     return () => {
       console.log('🧹 [Whiteboard] Cleaning up canvas');
-      window.removeEventListener('keydown', handleKeyboard);
+      clearInterval(statusChecker); // 清理定时器
       
       if (canvasInstance && fabricCanvasRef.current === canvasInstance) {
         // 移除所有事件监听器
@@ -403,269 +356,6 @@ const Whiteboard = ({
     console.log('✅ [Whiteboard] Brush update completed - Width:', canvas.freeDrawingBrush?.width, 'Color:', canvas.freeDrawingBrush?.color);
   }, [brushSize, brushColor]); // 只依赖画笔属性，不会导致canvas重建
 
-  // Handler for context menu (right-click)
-  const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    
-    if (!fabricCanvasRef.current) {
-      console.warn('[Whiteboard] Canvas not available for context menu');
-      return;
-    }
-    
-    const canvas = fabricCanvasRef.current;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    const pointer = canvas.getPointer(event.nativeEvent);
-    
-    const objects = canvas.getObjects();
-    const clickedImage = objects.find(obj => 
-      obj.type === 'image' && 
-      obj.containsPoint(pointer)
-    ) as fabric.Image | undefined;
-
-    if (clickedImage) {
-      const bounds = clickedImage.getBoundingRect();
-      
-      // 内联选择矩形管理 - 移除现有的选择矩形
-      const existingSelection = objects.find(obj => 
-        obj.type === 'rect' && 
-        (obj as any).data?.type === 'selection-rect'
-      );
-      if (existingSelection) {
-        canvas.remove(existingSelection);
-      }
-
-      // 创建新的选择矩形
-      const selectionRect = new fabric.Rect({
-        left: bounds.left - 2,
-        top: bounds.top - 2,
-        width: bounds.width + 4,
-        height: bounds.height + 4,
-        fill: 'transparent',
-        stroke: '#2196F3',
-        strokeWidth: 2,
-        selectable: false,
-        evented: false,
-        data: { type: 'selection-rect' }
-      });
-      
-      canvas.add(selectionRect);
-      canvas.renderAll();
-
-      setStickerButtonPosition({
-        x: bounds.left + bounds.width / 2,
-        y: bounds.top - 20,
-        target: clickedImage
-      });
-    } else {
-      // 移除现有选择矩形
-      const existingSelection = objects.find(obj => 
-        obj.type === 'rect' && 
-        (obj as any).data?.type === 'selection-rect'
-      );
-      if (existingSelection) {
-        canvas.remove(existingSelection);
-        canvas.renderAll();
-      }
-
-      setMenuPosition({ x: event.clientX, y: event.clientY });
-      setClickPosition({ x, y });
-      setStickerButtonPosition(null);
-    }
-  }, []);
-
-  // 处理贴纸转换
-  const handleStickerConvert = useCallback((imageUrl: string) => {
-    if (!imageUrl) {
-      console.error('[Whiteboard] No image URL provided for sticker conversion');
-      return;
-    }
-
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) {
-      console.error('[Whiteboard] Canvas not available for sticker conversion');
-      return;
-    }
-
-    // Record state before conversion
-    const currentState: DrawingState = {
-      canvasState: JSON.stringify(canvas.toJSON()),
-      timestamp: Date.now()
-    };
-    setHistory(prev => {
-      const newHistory = [...prev, currentState].slice(-20); 
-      return newHistory;
-    });
-
-    // Close sticker button
-    setStickerButtonPosition(null);
-  }, []);
-
-  // 处理图片上传
-  const handleImageProcessed = useCallback(async (processedImage: ProcessedImage) => {
-    if (!fabricCanvasRef.current || !clickPosition) {
-        console.error('[Whiteboard] Canvas or click position not available for image upload');
-        return;
-    }
-
-    const canvas = fabricCanvasRef.current;
-    
-    // 保存当前画布状态
-    const currentDrawingMode = canvas.isDrawingMode;
-    const currentBrush = canvas.freeDrawingBrush;
-    
-    const img = new Image();
-    
-    img.onload = () => {
-      // 计算图片缩放比例，确保图片不会太大
-      const maxSize = 250;
-      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
-      
-      const imagePosition = {
-        x: clickPosition.x - (img.width * scale) / 2,
-        y: clickPosition.y - (img.height * scale) / 2
-      };
-      
-      const fabricImage = new fabric.Image(img, {
-        left: imagePosition.x,
-        top: imagePosition.y,
-        scaleX: scale,
-        scaleY: scale,
-        selectable: false,
-        hasControls: false,
-        evented: false
-      });
-
-      try {
-        // 先添加图片到画布，确保图片能显示
-        canvas.add(fabricImage);
-        
-        // 设置canvas引用
-        fabricImage.canvas = canvas;
-        
-        // 应用照片效果，PhotoEffect内部已经包含动画
-        PhotoEffect.applyPhotoEffect(fabricImage, {
-          animation: {
-            initial: { scale: 0.7, opacity: 0, rotation: -15 },
-            final: { scale: 1, opacity: 1, rotation: PhotoEffect.getRandomRotation() },
-            duration: 1400,
-            easing: 'easeOutBack'
-          }
-        });
-
-        // 立即渲染，不等待动画
-        canvas.renderAll();
-
-        // 等待动画完成后设置交互性
-        setTimeout(() => {
-          fabricImage.set({ 
-            selectable: true, 
-            hasControls: true, 
-            evented: true 
-          });
-          
-          // 添加选中事件监听
-          fabricImage.on('selected', () => {
-            const bounds = fabricImage.getBoundingRect();
-            setStickerButtonPosition({
-              x: bounds.left + bounds.width / 2,
-              y: bounds.top - 20,
-              target: fabricImage
-            });
-          });
-
-          fabricImage.on('deselected', () => {
-            setStickerButtonPosition(null);
-          });
-          
-          // 恢复画布绘图状态
-          canvas.isDrawingMode = currentDrawingMode;
-          if (!currentBrush) {
-            const brush = new fabric.PencilBrush(canvas);
-            brush.width = canvas.freeDrawingBrush?.width || brushSize;
-            brush.color = canvas.freeDrawingBrush?.color || brushColor;
-            (brush as any).decimate = 8;
-            (brush as any).controlPointsNum = 2;
-            canvas.freeDrawingBrush = brush;
-          } else {
-            canvas.freeDrawingBrush = currentBrush;
-          }
-          canvas.renderAll();
-          
-          // 记录历史状态 - 内联避免依赖
-          const currentCanvas = fabricCanvasRef.current;
-          if (currentCanvas) {
-            const currentState: DrawingState = {
-              canvasState: JSON.stringify(currentCanvas.toJSON()),
-              timestamp: Date.now()
-            };
-            setHistory(prev => {
-              const newHistory = [...prev, currentState].slice(-20); 
-              return newHistory;
-            });
-          }
-        }, 100); // 缩短等待时间，让用户更快看到效果
-
-      } catch (error: any) {
-        console.error('[Whiteboard] 照片效果应用失败:', error);
-        // fallback: 简单添加图片
-        canvas.add(fabricImage);
-        fabricImage.set({ selectable: true, hasControls: true, evented: true });
-        
-        // 恢复画笔状态
-        canvas.isDrawingMode = currentDrawingMode;
-        if (!currentBrush) {
-          const brush = new fabric.PencilBrush(canvas);
-          brush.width = brushSize;
-          brush.color = brushColor;
-          (brush as any).decimate = 8;
-          (brush as any).controlPointsNum = 2;
-          canvas.freeDrawingBrush = brush;
-        } else {
-          canvas.freeDrawingBrush = currentBrush;
-        }
-        canvas.renderAll();
-        
-        // 记录历史状态 - 内联避免依赖
-        const currentCanvas = fabricCanvasRef.current;
-        if (currentCanvas) {
-          const currentState: DrawingState = {
-            canvasState: JSON.stringify(currentCanvas.toJSON()),
-            timestamp: Date.now()
-          };
-          setHistory(prev => {
-            const newHistory = [...prev, currentState].slice(-20); 
-            return newHistory;
-          });
-        }
-      }
-
-      setMenuPosition(null);
-      setClickPosition(null);
-    };
-
-    img.onerror = (errorEvent) => {
-      console.error('[Whiteboard] 图片加载失败:', errorEvent);
-      // 恢复画布状态
-      canvas.isDrawingMode = currentDrawingMode;
-      if (!currentBrush) {
-        const brush = new fabric.PencilBrush(canvas);
-        brush.width = brushSize;
-        brush.color = brushColor;
-        (brush as any).decimate = 8;
-        (brush as any).controlPointsNum = 2;
-        canvas.freeDrawingBrush = brush;
-      } else {
-        canvas.freeDrawingBrush = currentBrush;
-      }
-      alert('图片加载失败，请重试');
-    };
-
-    img.src = processedImage.dataUrl;
-  }, [clickPosition, brushSize, brushColor]);
-
   return (
     <div className="whiteboard-wrapper">
       <Toolbar 
@@ -692,72 +382,10 @@ const Whiteboard = ({
       </div>
 
       <div className="whiteboard-main-content">
-        <div 
-          className="whiteboard-container"
-          onContextMenu={handleContextMenu}
-        >
-          <UndoButton 
-            canUndo={history.length > 1}
-            onUndo={() => {
-              const currentCanvas = fabricCanvasRef.current;
-              if (!currentCanvas) {
-                console.warn('[Whiteboard] Cannot undo: canvas not available');
-                return;
-              }
-
-              setHistory(prevHistory => {
-                if (prevHistory.length <= 1) { 
-                  return prevHistory; 
-                }
-
-                try {
-                  const prevState = prevHistory[prevHistory.length - 2]; 
-                  currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
-                    currentCanvas.isDrawingMode = initialIsDrawingMode; 
-                    // 恢复画笔设置 - 使用当前状态值，确保撤销后画笔正确
-                    const currentBrushSize = fabricCanvasRef.current?.freeDrawingBrush?.width || 5;
-                    const currentBrushColor = fabricCanvasRef.current?.freeDrawingBrush?.color || '#000000';
-                    const brush = new fabric.PencilBrush(currentCanvas);
-                    brush.width = currentBrushSize;
-                    brush.color = currentBrushColor;
-                    (brush as any).decimate = 8;
-                    (brush as any).controlPointsNum = 2;
-                    currentCanvas.freeDrawingBrush = brush;
-                    currentCanvas.renderAll();
-                  });
-                  return prevHistory.slice(0, -1); 
-                } catch (error) {
-                  console.error('[Whiteboard] Undo failed:', error);
-                  return prevHistory; 
-                }
-              });
-            }}
-          />
+        <div className="whiteboard-container">
           <div className="canvas-wrapper">
             <canvas ref={canvasElRef} />
           </div>
-          {menuPosition && (
-            <ImageUploader onImageProcessed={handleImageProcessed}>
-              {(triggerUpload) => (
-                <FloatingMenu
-                  position={menuPosition}
-                  onUploadClick={triggerUpload}
-                  onClose={() => {
-                    setMenuPosition(null);
-                    setClickPosition(null);
-                  }}
-                />
-              )}
-            </ImageUploader>
-          )}
-          {stickerButtonPosition && (
-            <FloatingButton
-              position={stickerButtonPosition}
-              onConvert={handleStickerConvert}
-              onClose={() => setStickerButtonPosition(null)}
-              targetImage={stickerButtonPosition.target}
-            />
-          )}
         </div>
       </div>
 
