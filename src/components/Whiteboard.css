@@ -55,6 +55,25 @@
   transform: none;
 }
 
+/* 切换按钮的活跃状态 */
+.ai-generation-btn.active {
+  background: linear-gradient(145deg, #d4a574 0%, #c49660 100%);
+  color: #654321;
+  border-color: rgba(101, 67, 33, 0.4);
+  box-shadow: 
+    inset 0 2px 6px rgba(101, 67, 33, 0.2),
+    0 2px 4px rgba(139, 90, 60, 0.15);
+  transform: none;
+}
+
+.ai-generation-btn.active:hover {
+  background: linear-gradient(145deg, #ddb184 0%, #d4a574 100%);
+  transform: translateY(-1px);
+  box-shadow: 
+    inset 0 2px 6px rgba(101, 67, 33, 0.15),
+    0 4px 8px rgba(139, 90, 60, 0.2);
+}
+
 /* 主内容区域 */
 .whiteboard-main-content {
   display: flex;

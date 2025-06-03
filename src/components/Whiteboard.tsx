@@ -250,52 +250,102 @@ const Whiteboard = ({
       canvasY = floatingMenuPosition.y - rect.top;
     }
 
-    // 创建便签背景（蓝色矩形）
+    // 创建手账风格的便签背景
     const stickyBg = new fabric.Rect({
       left: canvasX,
       top: canvasY,
-      width: 200,
-      height: 200,
-      fill: '#4FC3F7', // 蓝色背景
-      stroke: '#29B6F6',
-      strokeWidth: 2,
-      rx: 8, // 圆角
-      ry: 8,
+      width: 180,
+      height: 180,
+      fill: '#FFE082', // 温暖的黄色便签色
+      stroke: '#FFC107',
+      strokeWidth: 1,
+      rx: 3, // 小圆角，更像真实便签
+      ry: 3,
       shadow: new fabric.Shadow({
-        color: 'rgba(0, 0, 0, 0.2)',
-        blur: 10,
-        offsetX: 3,
+        color: 'rgba(255, 193, 7, 0.3)',
+        blur: 8,
+        offsetX: 2,
         offsetY: 3
       }),
-      selectable: true,
-      hasControls: true,
-      evented: true
+      selectable: false, // 背景不可选择
+      evented: false,    // 背景不响应事件
+      excludeFromExport: false
     });
 
-    // 创建可编辑文本框
-    const stickyText = new fabric.IText('双击编辑文字', {
-      left: canvasX + 100, // 居中
-      top: canvasY + 100,  // 居中
-      fontFamily: 'Microsoft YaHei, Arial, sans-serif',
-      fontSize: 18,
-      fill: 'white',
-      textAlign: 'center',
-      originX: 'center',
-      originY: 'center',
-      width: 180,
+    // 添加便签纸的装饰线条（模拟便签纸的边距线）
+    const marginLine = new fabric.Line([canvasX + 25, canvasY + 15, canvasX + 25, canvasY + 165], {
+      stroke: '#FFB74D',
+      strokeWidth: 1,
+      selectable: false,
+      evented: false,
+      opacity: 0.6
+    });
+
+    // 创建可编辑文本，作为独立对象
+    const stickyText = new fabric.IText('点击输入文字...', {
+      left: canvasX + 40,
+      top: canvasY + 30,
+      fontFamily: 'Microsoft YaHei, PingFang SC, Hiragino Sans GB, sans-serif',
+      fontSize: 14,
+      fill: '#5D4037', // 深棕色文字，像笔迹
+      fontWeight: 'normal',
+      lineHeight: 1.4,
+      textAlign: 'left',
+      width: 120,
       selectable: true,
       editable: true,
-      hasControls: false, // 文本不显示控制框，只有背景显示
-      lockMovementX: false,
-      lockMovementY: false
+      hasControls: true,
+      hasBorders: true,
+      borderColor: '#FFC107',
+      cornerColor: '#FFB74D',
+      cornerSize: 6,
+      transparentCorners: false
     });
 
-    // 分别添加背景和文本
+    // 创建一个自定义组合，让背景跟随文字移动
+    const createStickyGroup = () => {
+      // 先移除旧的组件（如果存在）
+      canvas.remove(stickyBg);
+      canvas.remove(marginLine);
+      canvas.remove(stickyText);
+      
+      // 重新计算位置
+      const textLeft = stickyText.left || 0;
+      const textTop = stickyText.top || 0;
+      
+      stickyBg.set({
+        left: textLeft - 40,
+        top: textTop - 30
+      });
+      
+      marginLine.set({
+        x1: textLeft - 15,
+        y1: textTop - 15,
+        x2: textLeft - 15,
+        y2: textTop + 135
+      });
+      
+      // 重新添加到画布
+      canvas.add(stickyBg);
+      canvas.add(marginLine);
+      canvas.add(stickyText);
+      canvas.renderAll();
+    };
+
+    // 监听文字移动事件，让背景跟随
+    stickyText.on('moving', createStickyGroup);
+    stickyText.on('modified', createStickyGroup);
+
+    // 添加到画布
     canvas.add(stickyBg);
+    canvas.add(marginLine);
     canvas.add(stickyText);
+    
+    // 设置文字为活动对象，方便编辑
+    canvas.setActiveObject(stickyText);
     canvas.renderAll();
     
-    console.log('✅ [handleStickyNoteCreated] Sticky note created with separate bg and text');
+    console.log('✅ [handleStickyNoteCreated] Hand-journal style sticky note created');
     
     setFloatingMenuPosition(null); // 关闭菜单
   }, [floatingMenuPosition]);
@@ -405,7 +455,7 @@ const Whiteboard = ({
           📊 日志
         </button>
         <button 
-          className="ai-generation-btn"
+          className={`ai-generation-btn ${!isDrawingMode ? 'active' : ''}`}
           onClick={toggleDrawingMode}
           title={isDrawingMode ? "切换到选择模式（可拖拽图片）" : "切换到绘图模式"}
         >
