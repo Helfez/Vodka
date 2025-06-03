@@ -7,6 +7,7 @@ import { LogViewer } from './LogViewer/LogViewer';
 import FloatingMenu from './FloatingMenu/FloatingMenu';
 import ImageUploader from './ImageUpload/ImageUploader';
 import { ProcessedImage } from './ImageUpload/ImageProcessor';
+import { PhotoEffect } from './ImageUpload/PhotoEffect/PhotoEffect';
 
 // Type alias for Fabric.js Canvas instance with custom properties if any
 interface FabricCanvas extends fabric.Canvas {
@@ -136,9 +137,19 @@ const Whiteboard = ({
 
     const img = new Image();
     img.onload = () => {
+      // 计算canvas坐标：如果有右键位置，转换为canvas坐标
+      let canvasX = 100;
+      let canvasY = 100;
+      
+      if (floatingMenuPosition && canvasElRef.current) {
+        const rect = canvasElRef.current.getBoundingClientRect();
+        canvasX = floatingMenuPosition.x - rect.left;
+        canvasY = floatingMenuPosition.y - rect.top;
+      }
+
       const fabricImage = new fabric.Image(img, {
-        left: floatingMenuPosition?.x || 100,
-        top: floatingMenuPosition?.y || 100,
+        left: canvasX,
+        top: canvasY,
         scaleX: 0.3,
         scaleY: 0.3,
         selectable: true,
@@ -146,7 +157,8 @@ const Whiteboard = ({
         evented: true
       });
 
-      canvas.add(fabricImage);
+      // 应用拍立得特效
+      PhotoEffect.applyPhotoEffect(fabricImage);
       canvas.renderAll();
     };
 
@@ -203,13 +215,13 @@ const Whiteboard = ({
     const rightClickHandler = (opt: any) => {
       if (opt.e instanceof MouseEvent && opt.e.button === 2) {
         opt.e.preventDefault();
-        // 使用fabric.js提供的指针位置，更准确
-        const pointer = canvasInstance.getPointer(opt.e);
+        // 使用页面绝对坐标，因为FloatingMenu使用position: fixed
+        const rect = canvasElement.getBoundingClientRect();
         setFloatingMenuPosition({
-          x: pointer.x,
-          y: pointer.y
+          x: opt.e.clientX,
+          y: opt.e.clientY
         });
-        console.log('🖱️ Right click at:', pointer.x, pointer.y);
+        console.log('🖱️ Right click at page position:', opt.e.clientX, opt.e.clientY);
       }
     };
     
