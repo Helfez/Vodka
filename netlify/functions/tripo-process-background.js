@@ -1,7 +1,7 @@
 import { getStore } from '@netlify/blobs';
 
 export default async (request, context) => {
-    console.log('[tripo-process-background] 🎯 后台处理函数启动');
+    console.log('[tripo-process-background] 🎯 后台处理函数启动 - 已更新API密钥');
     
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
