@@ -179,19 +179,9 @@ const Whiteboard = ({
     const handlePathCreated = (e: fabric.TEvent & { path: fabric.Path }) => {
       console.log('🎯 [Whiteboard] PATH CREATED - Objects:', canvasInstance.getObjects().length);
       
-      // 🔧 激进方案：每笔都强制完整重渲染
-      const allObjects = canvasInstance.getObjects();
-      console.log('💾 [Whiteboard] Saving', allObjects.length, 'objects for forced rerender');
-      
-      // 保存canvas的完整状态
-      const canvasData = canvasInstance.toJSON();
-      
-      // 清空canvas并重新加载
-      canvasInstance.clear();
-      canvasInstance.loadFromJSON(canvasData, () => {
-        canvasInstance.renderAll();
-        console.log('✅ [Whiteboard] Forced rerender completed with', canvasInstance.getObjects().length, 'objects');
-      });
+      // 🔧 简单方案：只做强制渲染，不清空canvas
+      canvasInstance.renderAll();
+      console.log('✅ [Whiteboard] Simple render completed');
     };
 
     // 对象添加事件
@@ -248,30 +238,13 @@ const Whiteboard = ({
     };
   }, [width, height, initialIsDrawingMode]); // 🔧 修复：只依赖canvas尺寸和绘图模式，画笔属性通过单独Effect更新
 
-  // 🔧 画笔更新Effect - 恢复正常功能
+  // 🔧 画笔更新Effect - 暂时禁用来测试
   useEffect(() => {
     console.log('🖌️ [Whiteboard] Brush update effect triggered - Size:', brushSize, 'Color:', brushColor);
     
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) {
-      console.warn('⚠️ [Whiteboard] Canvas not available for brush update');
-      return;
-    }
-
-    // 更新画笔属性，保持现有画笔实例
-    if (canvas.freeDrawingBrush) {
-      console.log('🔄 [Whiteboard] Updating existing brush properties');
-      canvas.freeDrawingBrush.width = brushSize;
-      canvas.freeDrawingBrush.color = brushColor;
-    } else {
-      console.log('🆕 [Whiteboard] Creating new brush instance');
-      const brush = new fabric.PencilBrush(canvas);
-      brush.width = brushSize;
-      brush.color = brushColor;
-      canvas.freeDrawingBrush = brush;
-    }
-    
-    console.log('✅ [Whiteboard] Brush update completed - Width:', canvas.freeDrawingBrush?.width, 'Color:', canvas.freeDrawingBrush?.color);
+    // 🚨 暂时禁用画笔更新来排查是否它导致清空
+    console.log('⚠️ [Whiteboard] BRUSH UPDATE DISABLED FOR TESTING');
+    return;
   }, [brushSize, brushColor]); // 只依赖画笔属性，不会导致canvas重建
 
   return (
