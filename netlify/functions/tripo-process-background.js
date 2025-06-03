@@ -232,19 +232,20 @@ export default async (request, context) => {
             ws.on('message', (data) => {
                 try {
                     const message = JSON.parse(data.toString());
-                    console.log(`[tripo-process-background] 📨 任务 ${taskId}: WebSocket消息:`, message);
+                    console.log(`[tripo-process-background] 📨 任务 ${taskId}: WebSocket消息:`, JSON.stringify(message, null, 2));
 
                     if (message.event === 'update') {
                         const status = message.data?.status;
                         console.log(`[tripo-process-background] 📊 任务 ${taskId}: 状态更新: ${status}`);
                         
-                        // 这里可以更新任务状态到Blob（可选）
+                        // 更新任务状态到Blob
                         if (status === 'running') {
                             store.setJSON(taskId, {
                                 ...taskDataFromBlob,
                                 status: 'processing',
                                 tripoTaskId: tripoTaskId,
-                                imageToken: imageToken
+                                imageToken: imageToken,
+                                progress: message.data?.progress || 50
                             }).catch(console.error);
                         }
                     } else if (message.event === 'finalized') {
@@ -253,19 +254,42 @@ export default async (request, context) => {
                         
                         const finalStatus = message.data?.status;
                         console.log(`[tripo-process-background] 🏁 任务 ${taskId}: 任务完成，状态: ${finalStatus}`);
+                        console.log(`[tripo-process-background] 📋 完整结果数据:`, JSON.stringify(message.data, null, 2));
                         
-                        if (finalStatus === 'success' && message.data?.result?.model) {
-                            resolve({
-                                modelUrl: message.data.result.model,
-                                previewUrl: message.data.result.preview,
-                                format: options.outputFormat || 'glb'
+                        if (finalStatus === 'success') {
+                            // 尝试多种可能的结果字段名称
+                            const resultData = message.data?.result || message.data;
+                            const modelUrl = resultData?.model || resultData?.model_url || resultData?.output?.model;
+                            const previewUrl = resultData?.preview || resultData?.preview_url || resultData?.thumbnail_url;
+                            
+                            console.log(`[tripo-process-background] 🔍 解析结果:`, {
+                                modelUrl,
+                                previewUrl,
+                                resultData: JSON.stringify(resultData, null, 2)
                             });
+                            
+                            if (modelUrl) {
+                                resolve({
+                                    modelUrl: modelUrl,
+                                    previewUrl: previewUrl,
+                                    format: options.outputFormat || 'glb',
+                                    rawResult: resultData
+                                });
+                            } else {
+                                console.error(`[tripo-process-background] ❌ 未找到模型URL，完整数据:`, JSON.stringify(message, null, 2));
+                                reject(new Error('任务成功但未找到模型URL'));
+                            }
                         } else {
-                            reject(new Error(`任务失败: ${message.data?.error || '未知错误'}`));
+                            const errorMsg = message.data?.error || message.data?.message || '未知错误';
+                            console.error(`[tripo-process-background] ❌ 任务失败，状态: ${finalStatus}, 错误: ${errorMsg}`);
+                            reject(new Error(`任务失败: ${errorMsg}`));
                         }
+                    } else {
+                        console.log(`[tripo-process-background] 📢 其他消息类型: ${message.event}`, JSON.stringify(message, null, 2));
                     }
                 } catch (error) {
                     console.error(`[tripo-process-background] ❌ WebSocket消息解析失败:`, error);
+                    console.error(`[tripo-process-background] 📄 原始消息:`, data.toString());
                 }
             });
 

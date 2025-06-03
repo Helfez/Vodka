@@ -43,7 +43,7 @@ const Whiteboard = ({
   // State for UI elements and drawing properties
   // const [brushSize, setBrushSize] = useState(5); // 注释掉未使用的变量
   // const [brushColor] = useState('#000000'); // 注释掉未使用的变量
-  
+
   // State for AI generation panel - isAIGenerationOpen might not be needed if panel is fully replaced
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isAIGenerationOpen, setIsAIGenerationOpen] = useState(false); 
@@ -103,14 +103,14 @@ const Whiteboard = ({
     }
 
     // 生成画布快照
-    const dataURL = canvas.toDataURL({
-      format: 'png',
-      quality: 0.8,
+      const dataURL = canvas.toDataURL({
+        format: 'png',
+        quality: 0.8,
       multiplier: 1
     });
-    
-    setCanvasSnapshot(dataURL);
-    setIsAIGenerationOpen(true);
+      
+      setCanvasSnapshot(dataURL);
+      setIsAIGenerationOpen(true);
   }, []);
 
   // 处理AI生成的图片
@@ -195,7 +195,7 @@ const Whiteboard = ({
           hasControls: true,
           evented: true
         });
-        
+
         console.log('✅ [handleImageUploaded] PhotoEffect applied and interactivity restored');
         
         canvas.renderAll();
@@ -341,7 +341,7 @@ const Whiteboard = ({
     
     // 设置文字为活动对象，方便编辑
     canvas.setActiveObject(stickyText);
-    canvas.renderAll();
+        canvas.renderAll();
     
     console.log('✅ [handleStickyNoteCreated] Hand-journal style sticky note created');
     
@@ -351,13 +351,13 @@ const Whiteboard = ({
   // 处理从ImagePanel拖拽图片到Canvas
   const handleImageDragToCanvas = useCallback((imageUrl: string, x?: number, y?: number) => {
     console.log('🖼️ [handleImageDragToCanvas] 添加图片到画板:', imageUrl.substring(0, 50) + '...');
-    
+
     const canvas = fabricCanvasRef.current;
     if (!canvas) {
       console.error('[Whiteboard] Canvas not available for image insertion');
       return;
     }
-
+    
     const img = new Image();
     
     // 🔧 设置crossOrigin防止canvas污染
@@ -373,7 +373,7 @@ const Whiteboard = ({
       // 计算适当的缩放比例
       const maxSize = Math.min(canvas.width! * 0.4, canvas.height! * 0.4);
       const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
-
+      
       const fabricImage = new fabric.Image(img, {
         left: canvasX - (img.width * scale) / 2,
         top: canvasY - (img.height * scale) / 2,
@@ -385,9 +385,9 @@ const Whiteboard = ({
         crossOrigin: 'anonymous'
       });
 
-      canvas.add(fabricImage);
-      canvas.renderAll();
-      
+        canvas.add(fabricImage);
+        canvas.renderAll();
+
       console.log('✅ [handleImageDragToCanvas] 图片已添加到画板');
     };
 
