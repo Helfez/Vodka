@@ -175,12 +175,6 @@ const Whiteboard = ({
     canvasInstance.freeDrawingBrush.width = 5;
     canvasInstance.freeDrawingBrush.color = '#000000';
 
-    // 绘制开始事件 - 落笔LOG
-    const handleDrawingStart = (e: any) => {
-      console.log('✏️ [Whiteboard] Drawing STARTED at:', e.pointer);
-      console.log('📊 [Whiteboard] Current canvas objects count:', canvasInstance.getObjects().length);
-    };
-
     // 路径创建事件 - 关键的绘制完成LOG
     const handlePathCreated = (e: fabric.TEvent & { path: fabric.Path }) => {
       console.log('🎯 [Whiteboard] ===== PATH CREATED =====');
@@ -304,16 +298,6 @@ const Whiteboard = ({
     const handleCanvasCleared = () => {
       console.error('🧹 [Whiteboard] CANVAS CLEARED! This causes drawing disappearance!');
       console.trace('📍 [Whiteboard] Canvas clear stack trace');
-    };
-
-    // 鼠标按下事件
-    const handleMouseDown = (e: any) => {
-      console.log('🖱️ [Whiteboard] Mouse DOWN at:', e.pointer);
-    };
-
-    // 鼠标释放事件
-    const handleMouseUp = (e: any) => {
-      console.log('🖱️ [Whiteboard] Mouse UP at:', e.pointer);
     };
 
     // 绑定所有事件监听器
