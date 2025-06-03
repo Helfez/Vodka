@@ -1,22 +1,23 @@
-/* 重写的简洁Whiteboard样式 - 不干扰Canvas绘制 */
+/* 手账风格的Whiteboard样式 - 不干扰Canvas绘制 */
 
-/* 最外层包装器 */
+/* 最外层包装器 - 手账背景 */
 .whiteboard-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
   position: relative;
-  padding: 20px;
-  background: #f8f9fa;
+  padding: 30px;
+  background: linear-gradient(145deg, #faf7f2 0%, #f1e6d7 100%);
   min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* AI生成按钮区域 */
+/* AI生成按钮区域 - 手账风格 */
 .ai-generation-trigger {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 30px;
+  right: 30px;
   z-index: 100;
   display: flex;
   gap: 12px;
@@ -24,24 +25,28 @@
 
 .ai-generation-btn,
 .log-viewer-button {
-  background: #ffffff;
-  color: #333333;
-  border: 1px solid #ddd;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
+  background: linear-gradient(145deg, #f5f1eb 0%, #ede4d3 100%);
+  color: #8b5a3c;
+  border: 1px solid rgba(139, 90, 60, 0.25);
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 3px 8px rgba(139, 90, 60, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .ai-generation-btn:hover,
 .log-viewer-button:hover {
-  background: #f5f5f5;
-  border-color: #ccc;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  background: linear-gradient(145deg, #f9f5ef 0%, #f1e6d7 100%);
+  border-color: rgba(139, 90, 60, 0.35);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 15px rgba(139, 90, 60, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .ai-generation-btn:disabled {
@@ -59,30 +64,74 @@
   flex: 1;
 }
 
-/* Canvas容器 - 关键：不设置任何影响Canvas的样式 */
+/* Canvas容器 - 手账纸张风格，但不影响内部Canvas */
 .whiteboard-container {
   position: relative;
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  background: linear-gradient(145deg, #fefcf8 0%, #f9f5ef 100%);
+  border: 2px solid rgba(212, 165, 116, 0.3);
+  border-radius: 16px;
+  box-shadow: 
+    0 12px 35px rgba(139, 90, 60, 0.15),
+    0 8px 15px rgba(139, 90, 60, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
   padding: 0;
   margin: 0;
+  overflow: hidden;
+}
+
+/* 手账纸张装饰效果 */
+.whiteboard-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 40px;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(to bottom, 
+    transparent 0%, 
+    rgba(255, 182, 193, 0.3) 10%, 
+    rgba(255, 182, 193, 0.3) 90%, 
+    transparent 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+.whiteboard-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    repeating-linear-gradient(
+      transparent,
+      transparent 24px,
+      rgba(139, 90, 60, 0.08) 24px,
+      rgba(139, 90, 60, 0.08) 26px
+    );
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 14px;
 }
 
 /* Canvas包装器 - 不设置尺寸，让Fabric.js完全控制 */
 .canvas-wrapper {
   position: relative;
-  border-radius: 7px;
+  border-radius: 14px;
   overflow: hidden;
+  z-index: 2;
 }
 
-/* Canvas样式 - 最小化干扰 */
+/* Canvas样式 - 关键：保持最小化，不影响Fabric.js */
 .whiteboard-container canvas {
   display: block !important;
   touch-action: none;
   cursor: crosshair;
+  border-radius: 14px;
   /* 不设置width和height，完全由Fabric.js控制 */
   /* 不设置任何transform或position */
   /* 不设置任何margin或padding */
+  /* 不设置background，让Fabric.js的backgroundColor生效 */
 }
