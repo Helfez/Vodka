@@ -14,21 +14,20 @@ interface FabricCanvas extends fabric.Canvas {
 interface WhiteboardProps {
   width?: number;
   height?: number;
-  isDrawingMode?: boolean;
+  // isDrawingMode?: boolean; // 移除未使用的参数
 }
 
 // Whiteboard component: Main component for the drawing canvas
 const Whiteboard = ({ 
   width = 900,  // 修复：与CSS容器尺寸匹配
   height = 650, // 修复：与CSS容器尺寸匹配
-  isDrawingMode: initialIsDrawingMode = true // Renamed prop to avoid conflict with canvas property
 }: WhiteboardProps) => {
   // Refs for canvas DOM element and Fabric canvas instance
   const canvasElRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
 
   // State for UI elements and drawing properties
-  const [brushSize, setBrushSize] = useState(5);
+  // const [brushSize, setBrushSize] = useState(5); // 注释掉未使用的变量
   // const [brushColor] = useState('#000000'); // 注释掉未使用的变量
   
   // State for AI generation panel - isAIGenerationOpen might not be needed if panel is fully replaced
