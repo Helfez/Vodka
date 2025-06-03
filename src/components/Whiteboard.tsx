@@ -203,11 +203,13 @@ const Whiteboard = ({
     const rightClickHandler = (opt: any) => {
       if (opt.e instanceof MouseEvent && opt.e.button === 2) {
         opt.e.preventDefault();
-        const rect = canvasElement.getBoundingClientRect();
+        // 使用fabric.js提供的指针位置，更准确
+        const pointer = canvasInstance.getPointer(opt.e);
         setFloatingMenuPosition({
-          x: opt.e.clientX - rect.left,
-          y: opt.e.clientY - rect.top
+          x: pointer.x,
+          y: pointer.y
         });
+        console.log('🖱️ Right click at:', pointer.x, pointer.y);
       }
     };
     
@@ -286,7 +288,10 @@ const Whiteboard = ({
       {floatingMenuPosition && (
         <FloatingMenu
           position={floatingMenuPosition}
-          onUploadClick={() => setShowImageUploader(true)}
+          onUploadClick={() => {
+            console.log('🔄 FloatingMenu upload clicked');
+            setShowImageUploader(true);
+          }}
           onClose={() => setFloatingMenuPosition(null)}
         />
       )}
@@ -294,9 +299,12 @@ const Whiteboard = ({
       {/* 图片上传器 */}
       {showImageUploader && (
         <ImageUploader onImageProcessed={handleImageUploaded}>
-          {(triggerUpload) => (
-            <button onClick={triggerUpload} style={{ display: 'none' }} />
-          )}
+          {(triggerUpload) => {
+            // 自动触发上传
+            console.log('📁 ImageUploader rendered, auto-triggering upload');
+            setTimeout(() => triggerUpload(), 100);
+            return <div style={{ display: 'none' }} />;
+          }}
         </ImageUploader>
       )}
     </div>
