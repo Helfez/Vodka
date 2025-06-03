@@ -145,10 +145,10 @@ const Whiteboard = ({
       isDrawingMode: initialIsDrawingMode,
     }) as FabricCanvas;
 
-    // 设置画笔
+    // 设置画笔 - 使用固定初始值，避免依赖状态变量
     const brush = new fabric.PencilBrush(canvasInstance);
-    brush.width = brushSize;
-    brush.color = brushColor;
+    brush.width = 5; // 固定初始值
+    brush.color = '#000000'; // 固定初始值
     (brush as any).decimate = 8;
     (brush as any).controlPointsNum = 2;
     canvasInstance.freeDrawingBrush = brush;
@@ -306,7 +306,7 @@ const Whiteboard = ({
         fabricCanvasRef.current = null;
       }
     };
-  }, [width, height, initialIsDrawingMode, brushSize, brushColor]); // 🔧 修复：添加画笔属性到依赖项
+  }, [width, height, initialIsDrawingMode]); // 🔧 修复：只依赖canvas尺寸和绘图模式，画笔属性通过单独Effect更新
 
   // 🔧 修复画笔更新Effect - 添加详细LOG监控
   useEffect(() => {
