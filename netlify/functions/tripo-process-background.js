@@ -257,12 +257,17 @@ export default async (request, context) => {
                         console.log(`[tripo-process-background] 📋 完整结果数据:`, JSON.stringify(message.data, null, 2));
                         
                         if (finalStatus === 'success') {
-                            // 尝试多种可能的结果字段名称
+                            // 根据API文档，从output字段获取模型URL
+                            const outputData = message.data?.output;
                             const resultData = message.data?.result || message.data;
-                            const modelUrl = resultData?.model || resultData?.model_url || resultData?.output?.model;
-                            const previewUrl = resultData?.preview || resultData?.preview_url || resultData?.thumbnail_url;
+                            
+                            // 优先从output字段获取模型URL
+                            const modelUrl = outputData?.model || outputData?.base_model || outputData?.pbr_model || 
+                                           resultData?.model || resultData?.model_url || resultData?.output?.model;
+                            const previewUrl = outputData?.rendered_image || resultData?.preview || resultData?.preview_url || resultData?.thumbnail_url;
                             
                             console.log(`[tripo-process-background] 🔍 解析结果:`, {
+                                outputData: JSON.stringify(outputData, null, 2),
                                 modelUrl,
                                 previewUrl,
                                 resultData: JSON.stringify(resultData, null, 2)
@@ -273,11 +278,50 @@ export default async (request, context) => {
                                     modelUrl: modelUrl,
                                     previewUrl: previewUrl,
                                     format: options.outputFormat || 'glb',
-                                    rawResult: resultData
+                                    rawResult: { output: outputData, result: resultData }
                                 });
                             } else {
                                 console.error(`[tripo-process-background] ❌ 未找到模型URL，完整数据:`, JSON.stringify(message, null, 2));
-                                reject(new Error('任务成功但未找到模型URL'));
+                                
+                                // 尝试更多可能的字段名称
+                                const allPossibleUrls = {
+                                    'output.model': message.data?.output?.model,
+                                    'output.base_model': message.data?.output?.base_model,
+                                    'output.pbr_model': message.data?.output?.pbr_model,
+                                    'result.model': message.data?.result?.model,
+                                    'result.model_url': message.data?.result?.model_url,
+                                    'result.output.model': message.data?.result?.output?.model,
+                                    'result.output.model_url': message.data?.result?.output?.model_url,
+                                    'data.model': message.data?.model,
+                                    'data.model_url': message.data?.model_url,
+                                    'data.output.model': message.data?.output?.model,
+                                    'data.output.model_url': message.data?.output?.model_url,
+                                    'data.rendered_image': message.data?.rendered_image,
+                                    'data.pbr_model': message.data?.pbr_model,
+                                    'data.glb_model': message.data?.glb_model,
+                                    'data.obj_model': message.data?.obj_model,
+                                    'result.rendered_image': message.data?.result?.rendered_image,
+                                    'result.pbr_model': message.data?.result?.pbr_model,
+                                    'result.glb_model': message.data?.result?.glb_model,
+                                    'result.obj_model': message.data?.result?.obj_model
+                                };
+                                
+                                console.log(`[tripo-process-background] 🔍 所有可能的URL字段:`, JSON.stringify(allPossibleUrls, null, 2));
+                                
+                                // 查找第一个非空的URL
+                                const foundUrl = Object.entries(allPossibleUrls).find(([key, value]) => value && typeof value === 'string');
+                                
+                                if (foundUrl) {
+                                    console.log(`[tripo-process-background] ✅ 找到模型URL在字段: ${foundUrl[0]} = ${foundUrl[1]}`);
+                                    resolve({
+                                        modelUrl: foundUrl[1],
+                                        previewUrl: previewUrl,
+                                        format: options.outputFormat || 'glb',
+                                        rawResult: resultData
+                                    });
+                                } else {
+                                    reject(new Error('任务成功但无法获取结果URL'));
+                                }
                             }
                         } else {
                             const errorMsg = message.data?.error || message.data?.message || '未知错误';
