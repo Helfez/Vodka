@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { AihubmixVisionService } from '../ImageSticker/services/aihubmix-vision.service';
 import { AihubmixDalleService } from '../ImageSticker/services/aihubmix-dalle.service';
 import { DEFAULT_SYSTEM_PROMPT } from '../../config/ai-prompts';
@@ -18,8 +18,10 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
 }) => {
 
   const [systemPrompt, setSystemPrompt] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const visionService = AihubmixVisionService.getInstance();
   const dalleService = AihubmixDalleService.getInstance();
+  const hasStartedRef = useRef<boolean>(false);
 
   // 硬编码的参考图片URL
   const REFERENCE_IMAGE_URL = 'https://res.cloudinary.com/dqs6g6vrd/image/upload/v1748501675/wechat_2025-05-28_153406_424_rhmgt4.png';
@@ -49,8 +51,15 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       return;
     }
 
+    if (isGenerating) {
+      console.log('[AIGenerationPanel] ⚠️ 生成中，跳过重复请求');
+      return;
+    }
+
     console.log('[AIGenerationPanel] === 开始AI图片生成流程 ===');
     console.log('[AIGenerationPanel] 📋 使用System Prompt长度:', systemPrompt.length);
+
+    setIsGenerating(true);
 
     try {
       // 第一步：使用已加载的系统提示词分析图像
@@ -121,16 +130,25 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       console.error('[AIGenerationPanel] ❌ AI生成失败:', error);
       alert('AI图片生成失败: ' + (error instanceof Error ? error.message : '未知错误'));
       onClose();
+    } finally {
+      setIsGenerating(false);
     }
-  }, [canvasSnapshot, systemPrompt, visionService, dalleService, onImageGenerated, onClose]);
+  }, [canvasSnapshot, systemPrompt, isGenerating]); // 简化依赖项
 
-  // 面板打开时自动开始生成（但要等systemPrompt加载完成）
+  // 面板打开时自动开始生成（只执行一次）
   useEffect(() => {
-    if (isOpen && canvasSnapshot && systemPrompt) {
+    if (isOpen && canvasSnapshot && systemPrompt && !hasStartedRef.current && !isGenerating) {
       console.log('[AIGenerationPanel] 🚀 面板打开，System Prompt已就绪，开始生成');
+      hasStartedRef.current = true;
       handleOneClickGenerate();
     }
-  }, [isOpen, canvasSnapshot, systemPrompt, handleOneClickGenerate]);
+    
+    // 面板关闭时重置状态
+    if (!isOpen) {
+      hasStartedRef.current = false;
+      setIsGenerating(false);
+    }
+  }, [isOpen, canvasSnapshot, systemPrompt]); // 移除handleOneClickGenerate依赖
 
   // 不渲染任何UI
   return null;
