@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
 import './Whiteboard.css';
-import Toolbar from './Toolbar';
+// import Toolbar from './Toolbar'; // 暂时注释掉
 import { AIGenerationPanel } from './AIGeneration/AIGenerationPanel';
 import { LogViewer } from './LogViewer/LogViewer';
 
@@ -29,7 +29,7 @@ const Whiteboard = ({
 
   // State for UI elements and drawing properties
   const [brushSize, setBrushSize] = useState(5);
-  const [brushColor] = useState('#000000'); // 移除setBrushColor，暂时不需要
+  // const [brushColor] = useState('#000000'); // 暂时注释掉
   
   // State for AI generation panel - isAIGenerationOpen might not be needed if panel is fully replaced
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -54,12 +54,10 @@ const Whiteboard = ({
 
   // --- Callbacks ---
 
-  // Handler for brush size changes
-  const handleBrushSizeChange = useCallback((newSize: number) => {
-    setBrushSize(newSize);
-  }, []);
-
-  // 删除clearCanvas函数 - 暂时不需要
+  // 删除handleBrushSizeChange函数 - 暂时不需要
+  // const handleBrushSizeChange = useCallback((newSize: number) => {
+  //   setBrushSize(newSize);
+  // }, []);
 
   // AI生成面板处理
   const handleOpenAIPanel = useCallback(() => {
