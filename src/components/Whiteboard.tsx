@@ -41,6 +41,9 @@ const Whiteboard = ({
   // State for log viewer
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
 
+  // 🔍 组件渲染监控 - 关键：检测是否因为StrictMode导致重复渲染
+  console.log('🔄 [Whiteboard] Component RENDER - brushSize:', brushSize, 'timestamp:', Date.now());
+
   // --- Helper Functions ---
   
   // 移除未使用的createBrush函数 - 现在都用内联创建
@@ -314,7 +317,7 @@ const Whiteboard = ({
     };
   }, [width, height, initialIsDrawingMode]); // 🔧 修复：只依赖canvas尺寸和绘图模式，画笔属性通过单独Effect更新
 
-  // 🔧 修复画笔更新Effect - 添加详细LOG监控
+  // 🔧 画笔更新Effect - 恢复正常功能
   useEffect(() => {
     console.log('🖌️ [Whiteboard] Brush update effect triggered - Size:', brushSize, 'Color:', brushColor);
     
