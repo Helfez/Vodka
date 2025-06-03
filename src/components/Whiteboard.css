@@ -133,6 +133,7 @@
   width: 100%;
   height: 100%;
   border-radius: 14px;
+  overflow: hidden;
   z-index: 10; /* 提高层级 */
 }
 
