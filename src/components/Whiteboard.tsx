@@ -270,11 +270,6 @@ const Whiteboard = ({
       console.log('📊 [Whiteboard] Current canvas objects count:', canvasInstance.getObjects().length);
     };
 
-    // 绘制进行中事件
-    const handleDrawingProgress = (e: any) => {
-      console.log('✏️ [Whiteboard] Drawing in progress...');
-    };
-
     // 路径创建事件 - 关键的绘制完成LOG
     const handlePathCreated = (e: fabric.TEvent & { path: fabric.Path }) => {
       console.log('🎯 [Whiteboard] ===== PATH CREATED =====');
@@ -407,16 +402,6 @@ const Whiteboard = ({
     
     console.log('✅ [Whiteboard] Brush update completed - Width:', canvas.freeDrawingBrush?.width, 'Color:', canvas.freeDrawingBrush?.color);
   }, [brushSize, brushColor]); // 只依赖画笔属性，不会导致canvas重建
-
-  // Effect for component unmount
-  useEffect(() => {
-    return () => {
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
-        fabricCanvasRef.current = null;
-      }
-    };
-  }, []);
 
   // Handler for context menu (right-click)
   const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
