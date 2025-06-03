@@ -5,6 +5,7 @@ import './Whiteboard.css'; // 重新启用CSS
 import { AIGenerationPanel } from './AIGeneration/AIGenerationPanel';
 import { LogViewer } from './LogViewer/LogViewer';
 import { Tripo3DPanel } from './Tripo3D/Tripo3DPanel'; // 新增Tripo3D面板
+import { ImagePanel } from './ImagePanel/ImagePanel'; // 新增图片面板
 import FloatingMenu from './FloatingMenu/FloatingMenu';
 import ImageUploader from './ImageUpload/ImageUploader';
 import { ProcessedImage } from './ImageUpload/ImageProcessor';
@@ -20,6 +21,14 @@ interface WhiteboardProps {
   width?: number;
   height?: number;
   // isDrawingMode?: boolean; // 移除未使用的参数
+}
+
+// 生成图片接口
+interface GeneratedImage {
+  id: string;
+  url: string;
+  timestamp: number;
+  prompt?: string;
 }
 
 // Whiteboard component: Main component for the drawing canvas
@@ -53,6 +62,10 @@ const Whiteboard = ({
   // State for Tripo 3D generation
   const [isTripo3DOpen, setIsTripo3DOpen] = useState(false);
   const [tripo3DSnapshot, setTripo3DSnapshot] = useState<string>('');
+
+  // State for Image Panel (右侧图片面板)
+  const [isImagePanelOpen, setIsImagePanelOpen] = useState(false);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
 
   // 🔍 组件渲染监控 - 暂时注释掉避免编译错误
   // console.log('🔄 [Whiteboard] Component RENDER - brushSize:', brushSize, 'timestamp:', Date.now());
@@ -140,65 +153,24 @@ const Whiteboard = ({
 
   // 处理AI生成的图片
   const handleAIImageGenerated = useCallback((imageDataUrl: string) => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) {
-      console.error('[Whiteboard] Canvas not available for AI image insertion');
-      return;
-    }
-
-    const img = new Image();
+    console.log('🎨 [handleAIImageGenerated] AI图片生成完成，添加到右侧面板');
     
-    // 🔧 设置crossOrigin防止canvas污染
-    img.crossOrigin = 'anonymous';
-    
-    img.onload = () => {
-      console.log('✅ [handleAIImageGenerated] AI image loaded successfully');
-      
-      // 计算图片位置（居中放置）
-      const canvasCenter = {
-        x: canvas.width! / 2,
-        y: canvas.height! / 2
-      };
-
-      // 计算适当的缩放比例
-      const maxSize = Math.min(canvas.width! * 0.6, canvas.height! * 0.6);
-      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
-
-      const fabricImage = new fabric.Image(img, {
-        left: canvasCenter.x - (img.width * scale) / 2,
-        top: canvasCenter.y - (img.height * scale) / 2,
-        scaleX: scale,
-        scaleY: scale,
-        selectable: true,
-        hasControls: true,
-        evented: true,
-        // 🔧 确保fabric图片也不会污染canvas
-        crossOrigin: 'anonymous'
-      });
-
-      canvas.add(fabricImage);
-      canvas.renderAll();
-
-      // 🎲 AI生图完成后自动触发3D生成
-      console.log('🎨 [handleAIImageGenerated] AI图片生成完成，自动启动3D模型生成...');
-      setTimeout(() => {
-        try {
-          handle3DGenerateFromCanvas();
-        } catch (error) {
-          console.error('❌ [handleAIImageGenerated] 3D生成失败:', error);
-          // 如果3D生成失败，不影响图片显示
-        }
-      }, 1000); // 延迟1秒让用户看到图片添加效果
+    // 生成新的图片对象
+    const newImage: GeneratedImage = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      url: imageDataUrl,
+      timestamp: Date.now(),
+      prompt: '通过AI分析画板内容生成' // 可以后续优化，传递实际的prompt
     };
 
-    img.onerror = (error) => {
-      console.error('❌ [handleAIImageGenerated] Failed to load AI generated image:', error);
-      alert('生成的图片加载失败，请重试');
-    };
-
-    // 🔧 确保设置src在crossOrigin之后
-    img.src = imageDataUrl;
-  }, [handle3DGenerateFromCanvas]);
+    // 添加到生成图片列表
+    setGeneratedImages(prev => [newImage, ...prev]);
+    
+    // 打开右侧图片面板
+    setIsImagePanelOpen(true);
+    
+    console.log('✅ [handleAIImageGenerated] 图片已添加到右侧面板，面板已打开');
+  }, []);
 
   // 处理图片上传
   const handleImageUploaded = useCallback((processedImage: ProcessedImage) => {
@@ -420,6 +392,57 @@ const Whiteboard = ({
     // 这里可以添加后续处理，比如将模型添加到画布或显示预览
   }, []);
 
+  // 处理从ImagePanel拖拽图片到Canvas
+  const handleImageDragToCanvas = useCallback((imageUrl: string, x?: number, y?: number) => {
+    console.log('🖼️ [handleImageDragToCanvas] 添加图片到画板:', imageUrl.substring(0, 50) + '...');
+    
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) {
+      console.error('[Whiteboard] Canvas not available for image insertion');
+      return;
+    }
+
+    const img = new Image();
+    
+    // 🔧 设置crossOrigin防止canvas污染
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      console.log('✅ [handleImageDragToCanvas] Image loaded successfully');
+      
+      // 计算图片位置
+      let canvasX = x || canvas.width! / 2;
+      let canvasY = y || canvas.height! / 2;
+      
+      // 计算适当的缩放比例
+      const maxSize = Math.min(canvas.width! * 0.4, canvas.height! * 0.4);
+      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+
+      const fabricImage = new fabric.Image(img, {
+        left: canvasX - (img.width * scale) / 2,
+        top: canvasY - (img.height * scale) / 2,
+        scaleX: scale,
+        scaleY: scale,
+        selectable: true,
+        hasControls: true,
+        evented: true,
+        crossOrigin: 'anonymous'
+      });
+
+      canvas.add(fabricImage);
+      canvas.renderAll();
+      
+      console.log('✅ [handleImageDragToCanvas] 图片已添加到画板');
+    };
+
+    img.onerror = (error) => {
+      console.error('❌ [handleImageDragToCanvas] Failed to load image:', error);
+      alert('图片加载失败，请重试');
+    };
+
+    img.src = imageUrl;
+  }, []);
+
   // --- Effects ---
 
   // Effect for initializing and managing the Fabric canvas instance
@@ -505,7 +528,7 @@ const Whiteboard = ({
   }, [width, height]);
 
   return (
-    <div className="whiteboard-wrapper">
+    <div className={`whiteboard-wrapper ${isImagePanelOpen ? 'with-image-panel' : ''}`}>
       {/* <Toolbar /> */}
       
       <div className="ai-generation-trigger">
@@ -530,6 +553,13 @@ const Whiteboard = ({
           title={isDrawingMode ? "切换到选择模式（可拖拽图片）" : "切换到绘图模式"}
         >
           {isDrawingMode ? '✏️ 绘图' : '👆 选择'}
+        </button>
+        <button 
+          className={`ai-generation-btn ${isImagePanelOpen ? 'active' : ''}`}
+          onClick={() => setIsImagePanelOpen(!isImagePanelOpen)}
+          title="显示/隐藏生成图片面板"
+        >
+          🖼️ 图片 {generatedImages.length > 0 && `(${generatedImages.length})`}
         </button>
       </div>
 
@@ -590,6 +620,14 @@ const Whiteboard = ({
           }}
         </ImageUploader>
       )}
+
+      {/* 右侧图片面板 */}
+      <ImagePanel
+        isOpen={isImagePanelOpen}
+        generatedImages={generatedImages}
+        onImageDragToCanvas={handleImageDragToCanvas}
+        onClose={() => setIsImagePanelOpen(false)}
+      />
     </div>
   );
 };
