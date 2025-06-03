@@ -179,21 +179,19 @@ const Whiteboard = ({
     const handlePathCreated = (e: fabric.TEvent & { path: fabric.Path }) => {
       console.log('🎯 [Whiteboard] PATH CREATED - Objects:', canvasInstance.getObjects().length);
       
-      // 🔧 简化：只做基本的强制渲染
-      canvasInstance.renderAll();
+      // 🔧 激进方案：每笔都强制完整重渲染
+      const allObjects = canvasInstance.getObjects();
+      console.log('💾 [Whiteboard] Saving', allObjects.length, 'objects for forced rerender');
       
-      // 🔧 延迟检查对象是否被意外清除，如果是则恢复
-      setTimeout(() => {
-        const currentCount = canvasInstance.getObjects().length;
-        if (currentCount === 0) {
-          console.log('🔧 [Whiteboard] Objects disappeared, attempting restore...');
-          // 简单的恢复机制：重新添加路径
-          if (e.path) {
-            canvasInstance.add(e.path);
-            canvasInstance.renderAll();
-          }
-        }
-      }, 100);
+      // 保存canvas的完整状态
+      const canvasData = canvasInstance.toJSON();
+      
+      // 清空canvas并重新加载
+      canvasInstance.clear();
+      canvasInstance.loadFromJSON(canvasData, () => {
+        canvasInstance.renderAll();
+        console.log('✅ [Whiteboard] Forced rerender completed with', canvasInstance.getObjects().length, 'objects');
+      });
     };
 
     // 对象添加事件
