@@ -22,8 +22,8 @@ export interface WangwangConfig {
 
 export const WANGWANG_CONFIG: WangwangConfig = {
   // TODO: 请替换为实际的店铺旺旺号
-  shopWangwang: "your_shop_wangwang_id",
-  shopName: "3D手办定制工坊",
+  shopWangwang: "tripo3d",
+  shopName: "TripoAI企业店",
   
   messageTemplates: {
     // 手办定制消息模板
@@ -108,6 +108,12 @@ export async function openWangwangChat(
     config = WANGWANG_CONFIG
   } = options;
 
+  // 检查是否在浏览器环境中
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    console.warn('[WangwangService] ⚠️ 非浏览器环境，无法打开阿里旺旺');
+    return;
+  }
+
   try {
     console.log('[WangwangService] 🎯 打开阿里旺旺聊天窗口');
     console.log('[WangwangService] 💬 消息内容:', message);
@@ -123,10 +129,10 @@ export async function openWangwangChat(
     console.log('[WangwangService] ✅ 已尝试打开阿里旺旺客户端');
     
     // 提供网页版兜底方案
-    if (showFallbackDialog) {
+    if (showFallbackDialog && typeof window.confirm === 'function') {
       setTimeout(() => {
         const webUrl = buildWangwangWebUrl(config);
-        const shouldOpenWeb = confirm(
+        const shouldOpenWeb = window.confirm(
           `如果阿里旺旺客户端未自动打开，点击确定使用网页版聊天\n\n或者您也可以直接联系：\n电话：${config.fallbackContacts.phone || '暂无'}\nQQ：${config.fallbackContacts.qq || '暂无'}`
         );
         
