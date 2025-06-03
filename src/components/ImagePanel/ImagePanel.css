@@ -308,4 +308,50 @@
 
 .image-panel-content::-webkit-scrollbar-thumb:hover {
   background: #a1a1a1;
+}
+
+/* 在文件末尾添加3D模型相关样式 */
+
+.model-actions-3d {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.download-btn-3d,
+.preview-btn-3d {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.download-btn-3d {
+  background: linear-gradient(145deg, #f5f1eb 0%, #ede4d3 100%);
+  color: #8b5a3c;
+  border: 1px solid rgba(139, 90, 60, 0.25);
+}
+
+.preview-btn-3d {
+  background: linear-gradient(145deg, #8b5a3c 0%, #a0694f 100%);
+  color: white;
+  border: 1px solid rgba(139, 90, 60, 0.5);
+}
+
+.download-btn-3d:hover {
+  background: linear-gradient(145deg, #f9f5ef 0%, #f1e6d7 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 90, 60, 0.15);
+}
+
+.preview-btn-3d:hover {
+  background: linear-gradient(145deg, #a0694f 0%, #b17a5f 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 90, 60, 0.25);
 } 

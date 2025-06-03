@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import './ImagePanel.css';
 import { TripoService } from '../ImageSticker/services/tripo.service';
+import { ModelViewer } from '../ModelViewer/ModelViewer';
+import './ImagePanel.css';
 
 interface GeneratedImage {
   id: string;
@@ -34,6 +35,12 @@ export const ImagePanel: React.FC<ImagePanelProps> = ({
     progress: 0,
     status: ''
   });
+  const [showModelViewer, setShowModelViewer] = useState(false);
+  const [currentModel, setCurrentModel] = useState<{
+    url: string;
+    format: string;
+    name: string;
+  } | null>(null);
 
   // 一键生成3D模型
   const handleGenerate3D = async (imageUrl: string, imageId: string) => {
@@ -181,13 +188,28 @@ export const ImagePanel: React.FC<ImagePanelProps> = ({
                 {activeImageId === image.id && tripoProgress.modelUrl && (
                   <div className="success-section">
                     <p className="success-text">✅ 3D模型生成完成</p>
-                    <a 
-                      href={tripoProgress.modelUrl} 
-                      download="model.glb"
-                      className="download-btn"
-                    >
-                      📥 下载模型
-                    </a>
+                    <div className="model-actions-3d">
+                      <a 
+                        href={tripoProgress.modelUrl} 
+                        download="model.glb"
+                        className="download-btn-3d"
+                      >
+                        📥 下载模型
+                      </a>
+                      <button
+                        className="preview-btn-3d"
+                        onClick={() => {
+                          setCurrentModel({
+                            url: tripoProgress.modelUrl!,
+                            format: 'glb',
+                            name: `图片${image.id}的3D模型`
+                          });
+                          setShowModelViewer(true);
+                        }}
+                      >
+                        🎬 预览3D模型
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -214,6 +236,20 @@ export const ImagePanel: React.FC<ImagePanelProps> = ({
           </div>
         )}
       </div>
+
+      {/* 3D模型查看器 */}
+      {currentModel && (
+        <ModelViewer
+          isOpen={showModelViewer}
+          onClose={() => {
+            setShowModelViewer(false);
+            setCurrentModel(null);
+          }}
+          modelUrl={currentModel.url}
+          modelFormat={currentModel.format}
+          modelName={currentModel.name}
+        />
+      )}
     </div>
   );
 }; 

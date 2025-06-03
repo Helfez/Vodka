@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { TripoService } from '../ImageSticker/services/tripo.service';
+import { ModelViewer } from '../ModelViewer/ModelViewer';
 import './Tripo3DPanel.css';
 
 interface Tripo3DPanelProps {
@@ -23,6 +24,7 @@ export const Tripo3DPanel: React.FC<Tripo3DPanelProps> = ({
     format: string;
     fileSize?: number;
   } | null>(null);
+  const [showModelViewer, setShowModelViewer] = useState(false);
 
   const tripoService = TripoService.getInstance();
 
@@ -156,6 +158,12 @@ export const Tripo3DPanel: React.FC<Tripo3DPanelProps> = ({
                 >
                   👁️ 在线预览
                 </button>
+                <button 
+                  className="preview-btn"
+                  onClick={() => setShowModelViewer(true)}
+                >
+                  🎬 预览3D模型
+                </button>
               </div>
               
               <div className="model-tip">
@@ -165,6 +173,17 @@ export const Tripo3DPanel: React.FC<Tripo3DPanelProps> = ({
           )}
         </div>
       </div>
+
+      {/* 3D模型查看器 */}
+      {result && (
+        <ModelViewer
+          isOpen={showModelViewer}
+          onClose={() => setShowModelViewer(false)}
+          modelUrl={result.modelUrl}
+          modelFormat={result.format}
+          modelName="AI生成的3D模型"
+        />
+      )}
     </div>
   );
 }; 

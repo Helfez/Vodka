@@ -237,7 +237,8 @@
 }
 
 .download-btn,
-.view-btn {
+.view-btn,
+.preview-btn {
   background: linear-gradient(145deg, #f5f1eb 0%, #ede4d3 100%);
   color: #8b5a3c;
   border: 1px solid rgba(139, 90, 60, 0.25);
@@ -251,11 +252,23 @@
   max-width: 140px;
 }
 
+.preview-btn {
+  background: linear-gradient(145deg, #8b5a3c 0%, #a0694f 100%);
+  color: white;
+  border: 1px solid rgba(139, 90, 60, 0.5);
+}
+
 .download-btn:hover,
 .view-btn:hover {
   background: linear-gradient(145deg, #f9f5ef 0%, #f1e6d7 100%);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(139, 90, 60, 0.15);
+}
+
+.preview-btn:hover {
+  background: linear-gradient(145deg, #a0694f 0%, #b17a5f 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 90, 60, 0.25);
 }
 
 .model-tip {
