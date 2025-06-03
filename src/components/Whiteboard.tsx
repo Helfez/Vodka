@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
-// import './Whiteboard.css'; // 暂时注释掉测试无样式状态
+import './Whiteboard.css'; // 重新启用CSS
 // import Toolbar from './Toolbar'; // 移除Toolbar
 import { AIGenerationPanel } from './AIGeneration/AIGenerationPanel';
 import { LogViewer } from './LogViewer/LogViewer';
