@@ -216,7 +216,6 @@ const Whiteboard = ({
       if (opt.e instanceof MouseEvent && opt.e.button === 2) {
         opt.e.preventDefault();
         // 使用页面绝对坐标，因为FloatingMenu使用position: fixed
-        const rect = canvasElement.getBoundingClientRect();
         setFloatingMenuPosition({
           x: opt.e.clientX,
           y: opt.e.clientY
