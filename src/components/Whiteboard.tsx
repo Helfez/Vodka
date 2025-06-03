@@ -161,13 +161,19 @@ const Whiteboard = ({
     const brush = new fabric.PencilBrush(canvasInstance);
     brush.width = 5; // 固定初始值
     brush.color = '#000000'; // 固定初始值
-    (brush as any).decimate = 8;
-    (brush as any).controlPointsNum = 2;
+    // 🔧 移除可能导致问题的高级属性
+    // (brush as any).decimate = 8;
+    // (brush as any).controlPointsNum = 2;
     canvasInstance.freeDrawingBrush = brush;
     
     // 设置canvas属性
     canvasInstance.renderOnAddRemove = true;
     canvasInstance.preserveObjectStacking = true;
+    
+    // 🔧 尝试强制设置更简单的画笔模式
+    canvasInstance.isDrawingMode = true;
+    canvasInstance.freeDrawingBrush.width = 5;
+    canvasInstance.freeDrawingBrush.color = '#000000';
 
     // 绘制开始事件 - 落笔LOG
     const handleDrawingStart = (e: any) => {
@@ -311,69 +317,20 @@ const Whiteboard = ({
     };
 
     // 绑定所有事件监听器
-    console.log('🔗 [Whiteboard] Binding event listeners');
-    canvasInstance.on('mouse:down', handleMouseDown);
-    canvasInstance.on('mouse:up', handleMouseUp);
+    console.log('🔗 [Whiteboard] Binding essential event listeners only');
+    
+    // 🔧 只绑定最关键的事件，减少冲突
     canvasInstance.on('path:created', handlePathCreated);
     canvasInstance.on('object:added', handleObjectAdded);
     canvasInstance.on('object:removed', handleObjectRemoved);
     canvasInstance.on('canvas:cleared', handleCanvasCleared);
     
-    // 绘制相关事件 - 修复事件绑定
-    canvasInstance.on('before:path:created', handleDrawingStart);
-
-    // 🔍 添加更多监控事件
-    canvasInstance.on('before:render', () => {
-      console.log('🎨 [Whiteboard] Canvas BEFORE render, objects:', canvasInstance.getObjects().length);
-    });
-
-    canvasInstance.on('after:render', () => {
-      const objectCount = canvasInstance.getObjects().length;
-      console.log('🎨 [Whiteboard] Canvas AFTER render, objects:', objectCount);
-      if (objectCount === 0) {
-        console.error('🚨 [Whiteboard] RENDER CLEARED ALL OBJECTS!');
-        console.trace('📍 [Whiteboard] Render clear stack trace');
-      }
-    });
-
-    // 🔍 监控画布状态变化
-    const originalClear = canvasInstance.clear.bind(canvasInstance);
-    canvasInstance.clear = function(...args) {
-      console.error('🚨 [Whiteboard] CANVAS.CLEAR() CALLED!');
-      console.trace('📍 [Whiteboard] Clear method stack trace');
-      return originalClear(...args);
-    };
-
-    // 🔍 监控loadFromJSON调用
-    const originalLoadFromJSON = canvasInstance.loadFromJSON.bind(canvasInstance);
-    canvasInstance.loadFromJSON = function(json, callback, ...args) {
-      console.log('📥 [Whiteboard] LOAD_FROM_JSON called');
-      console.trace('📍 [Whiteboard] LoadFromJSON stack trace');
-      return originalLoadFromJSON(json, callback, ...args);
-    };
-
-    // 🔍 监控画布大小变化
-    const originalSetDimensions = canvasInstance.setDimensions.bind(canvasInstance);
-    canvasInstance.setDimensions = function(dimensions: any, options?: any) {
-      console.log('📐 [Whiteboard] CANVAS SIZE CHANGE:', dimensions);
-      const beforeCount = canvasInstance.getObjects().length;
-      const result = originalSetDimensions(dimensions, options);
-      const afterCount = canvasInstance.getObjects().length;
-      if (beforeCount !== afterCount) {
-        console.error('🚨 [Whiteboard] SIZE CHANGE CLEARED OBJECTS!', beforeCount, '->', afterCount);
-      }
-      return result;
-    };
-
-    // 🔍 定期检查画布状态
-    const statusChecker = setInterval(() => {
-      const objectCount = canvasInstance.getObjects().length;
-      console.log('⏰ [Whiteboard] Periodic check - Objects:', objectCount, 'Timestamp:', new Date().toLocaleTimeString());
-      
-      if (objectCount === 0) {
-        console.warn('⚠️ [Whiteboard] Periodic check found EMPTY canvas!');
-      }
-    }, 3000); // 每3秒检查一次
+    // 🔧 暂时移除可能冲突的事件监听器
+    // canvasInstance.on('mouse:down', handleMouseDown);
+    // canvasInstance.on('mouse:up', handleMouseUp);
+    // canvasInstance.on('before:path:created', handleDrawingStart);
+    
+    console.log('✅ [Whiteboard] Essential events bound successfully');
 
     fabricCanvasRef.current = canvasInstance;
     
@@ -384,17 +341,13 @@ const Whiteboard = ({
     // 清理函数
     return () => {
       console.log('🧹 [Whiteboard] Cleaning up canvas');
-      clearInterval(statusChecker); // 清理定时器
       
       if (canvasInstance && fabricCanvasRef.current === canvasInstance) {
         // 移除所有事件监听器
-        canvasInstance.off('mouse:down', handleMouseDown);
-        canvasInstance.off('mouse:up', handleMouseUp);
         canvasInstance.off('path:created', handlePathCreated);
         canvasInstance.off('object:added', handleObjectAdded);
         canvasInstance.off('object:removed', handleObjectRemoved);
         canvasInstance.off('canvas:cleared', handleCanvasCleared);
-        canvasInstance.off('before:path:created', handleDrawingStart);
         
         canvasInstance.dispose();
         fabricCanvasRef.current = null;
@@ -422,8 +375,6 @@ const Whiteboard = ({
       const brush = new fabric.PencilBrush(canvas);
       brush.width = brushSize;
       brush.color = brushColor;
-      (brush as any).decimate = 8;
-      (brush as any).controlPointsNum = 2;
       canvas.freeDrawingBrush = brush;
     }
     
