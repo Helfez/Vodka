@@ -110,18 +110,30 @@ export default async (request, context) => {
         const backgroundUrl = `${siteURL}/.netlify/functions/tripo-process-background`;
         console.log(`[tripo-generate] 🎯 后台处理URL: ${backgroundUrl}`);
         
-        // 异步触发后台处理，不等待结果
-        fetch(backgroundUrl, {
+        // 修改为等待fetch响应以便记录详细信息
+        console.log(`[tripo-generate] 📡 开始调用后台处理函数...`);
+        const fetchResponse = await fetch(backgroundUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ taskId }),
-        }).catch(error => {
-            console.error(`[tripo-generate] ❌ 后台处理触发失败:`, error.message);
         });
+        
+        console.log(`[tripo-generate] 📊 后台处理响应状态: ${fetchResponse.status}`);
+        console.log(`[tripo-generate] 📊 后台处理响应头:`, Object.fromEntries(fetchResponse.headers.entries()));
+        
+        if (!fetchResponse.ok) {
+            const errorText = await fetchResponse.text();
+            console.error(`[tripo-generate] ❌ 后台处理调用失败: ${fetchResponse.status}`);
+            console.error(`[tripo-generate] ❌ 错误响应内容:`, errorText);
+        } else {
+            const responseText = await fetchResponse.text();
+            console.log(`[tripo-generate] ✅ 后台处理调用成功`);
+            console.log(`[tripo-generate] 📄 响应内容:`, responseText);
+        }
 
-        console.log(`[tripo-generate] ✅ 后台处理已触发`);
     } catch (error) {
-        console.error(`[tripo-generate] ❌ 触发后台处理失败:`, error.message);
+        console.error(`[tripo-generate] ❌ 触发后台处理异常:`, error.message);
+        console.error(`[tripo-generate] ❌ 异常堆栈:`, error.stack);
         // 不立即返回错误，因为任务已经创建
     }
 
