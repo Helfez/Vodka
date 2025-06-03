@@ -4,6 +4,8 @@ import './Whiteboard.css'; // 重新启用CSS
 // import Toolbar from './Toolbar'; // 移除Toolbar
 import { AIGenerationPanel } from './AIGeneration/AIGenerationPanel';
 import { LogViewer } from './LogViewer/LogViewer';
+import FloatingMenu from './FloatingMenu/FloatingMenu';
+import ImageUploader from './ImageUpload/ImageUploader';
 
 // Type alias for Fabric.js Canvas instance with custom properties if any
 interface FabricCanvas extends fabric.Canvas {
@@ -39,6 +41,10 @@ const Whiteboard = ({
 
   // State for log viewer
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
+
+  // State for floating menu (right-click upload)
+  const [floatingMenuPosition, setFloatingMenuPosition] = useState<{x: number, y: number} | null>(null);
+  const [showImageUploader, setShowImageUploader] = useState(false);
 
   // 🔍 组件渲染监控 - 暂时注释掉避免编译错误
   // console.log('🔄 [Whiteboard] Component RENDER - brushSize:', brushSize, 'timestamp:', Date.now());
@@ -119,6 +125,47 @@ const Whiteboard = ({
     img.src = imageDataUrl;
   }, []);
 
+  // 处理图片上传
+  const handleImageUploaded = useCallback((processedImage: {dataUrl: string, width: number, height: number}) => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) {
+      console.error('[Whiteboard] Canvas not available for image upload');
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      const fabricImage = new fabric.Image(img, {
+        left: floatingMenuPosition?.x || 100,
+        top: floatingMenuPosition?.y || 100,
+        scaleX: 0.3,
+        scaleY: 0.3,
+        selectable: true,
+        hasControls: true,
+        evented: true
+      });
+
+      canvas.add(fabricImage);
+      canvas.renderAll();
+    };
+
+    img.src = processedImage.dataUrl;
+    setFloatingMenuPosition(null); // 关闭菜单
+    setShowImageUploader(false); // 关闭上传器
+  }, [floatingMenuPosition]);
+
+  // 处理右键点击
+  const handleCanvasRightClick = useCallback((e: MouseEvent) => {
+    e.preventDefault();
+    const rect = canvasElRef.current?.getBoundingClientRect();
+    if (rect) {
+      setFloatingMenuPosition({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    }
+  }, []);
+
   // --- Effects --- 
 
   // Effect for initializing and managing the Fabric canvas instance
@@ -160,6 +207,11 @@ const Whiteboard = ({
     brush.color = '#000000';
     canvasInstance.freeDrawingBrush = brush;
     
+    // 添加右键事件监听器
+    if (canvasElRef.current) {
+      canvasElRef.current.addEventListener('contextmenu', handleCanvasRightClick);
+    }
+    
     // 🔧 移除所有事件监听器，只保留基本功能
     console.log('✅ [Whiteboard] Minimal canvas setup completed');
 
@@ -168,12 +220,15 @@ const Whiteboard = ({
     // 简化的清理函数
     return () => {
       console.log('🧹 [Whiteboard] Cleaning up canvas');
+      if (canvasElRef.current) {
+        canvasElRef.current.removeEventListener('contextmenu', handleCanvasRightClick);
+      }
       if (canvasInstance && fabricCanvasRef.current === canvasInstance) {
         canvasInstance.dispose();
         fabricCanvasRef.current = null;
       }
     };
-  }, [width, height]); // 只依赖尺寸变化
+  }, [width, height, handleCanvasRightClick]); // 添加handleCanvasRightClick依赖
 
   return (
     <div className="whiteboard-wrapper">
@@ -218,6 +273,24 @@ const Whiteboard = ({
         isOpen={isLogViewerOpen}
         onClose={() => setIsLogViewerOpen(false)}
       />
+
+      {/* 右键浮动菜单 */}
+      {floatingMenuPosition && (
+        <FloatingMenu
+          position={floatingMenuPosition}
+          onUploadClick={() => setShowImageUploader(true)}
+          onClose={() => setFloatingMenuPosition(null)}
+        />
+      )}
+
+      {/* 图片上传器 */}
+      {showImageUploader && (
+        <ImageUploader onImageProcessed={handleImageUploaded}>
+          {(triggerUpload) => (
+            <button onClick={triggerUpload} style={{ display: 'none' }} />
+          )}
+        </ImageUploader>
+      )}
     </div>
   );
 };
