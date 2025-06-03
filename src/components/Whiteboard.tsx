@@ -88,17 +88,28 @@ const Whiteboard = ({
       return;
     }
 
-    // 生成画布快照
-    const dataURL = canvas.toDataURL({
-      format: 'png',
-      quality: 0.8,
-      multiplier: 1
-    });
-    
-    setTripo3DSnapshot(dataURL);
-    setIsTripo3DOpen(true);
-    
-    console.log('✅ [handle3DGenerateFromCanvas] Canvas snapshot created, opening 3D panel');
+    try {
+      // 生成画布快照
+      const dataURL = canvas.toDataURL({
+        format: 'png',
+        quality: 0.8,
+        multiplier: 1
+      });
+      
+      setTripo3DSnapshot(dataURL);
+      setIsTripo3DOpen(true);
+      
+      console.log('✅ [handle3DGenerateFromCanvas] Canvas snapshot created, opening 3D panel');
+    } catch (error) {
+      console.error('❌ [handle3DGenerateFromCanvas] Canvas导出失败:', error);
+      
+      if (error instanceof DOMException && error.name === 'SecurityError') {
+        alert('由于图片跨域限制，无法生成3D模型。请使用本地上传的图片或重新绘制。');
+        console.error('❌ Canvas被污染，可能包含跨域图片');
+      } else {
+        alert('画布导出失败，请重试');
+      }
+    }
   }, []);
 
   // --- Callbacks ---
@@ -136,7 +147,13 @@ const Whiteboard = ({
     }
 
     const img = new Image();
+    
+    // 🔧 设置crossOrigin防止canvas污染
+    img.crossOrigin = 'anonymous';
+    
     img.onload = () => {
+      console.log('✅ [handleAIImageGenerated] AI image loaded successfully');
+      
       // 计算图片位置（居中放置）
       const canvasCenter = {
         x: canvas.width! / 2,
@@ -154,7 +171,9 @@ const Whiteboard = ({
         scaleY: scale,
         selectable: true,
         hasControls: true,
-        evented: true
+        evented: true,
+        // 🔧 确保fabric图片也不会污染canvas
+        crossOrigin: 'anonymous'
       });
 
       canvas.add(fabricImage);
@@ -163,15 +182,21 @@ const Whiteboard = ({
       // 🎲 AI生图完成后自动触发3D生成
       console.log('🎨 [handleAIImageGenerated] AI图片生成完成，自动启动3D模型生成...');
       setTimeout(() => {
-        handle3DGenerateFromCanvas();
+        try {
+          handle3DGenerateFromCanvas();
+        } catch (error) {
+          console.error('❌ [handleAIImageGenerated] 3D生成失败:', error);
+          // 如果3D生成失败，不影响图片显示
+        }
       }, 1000); // 延迟1秒让用户看到图片添加效果
     };
 
-    img.onerror = () => {
-      console.error('[Whiteboard] Failed to load AI generated image');
+    img.onerror = (error) => {
+      console.error('❌ [handleAIImageGenerated] Failed to load AI generated image:', error);
       alert('生成的图片加载失败，请重试');
     };
 
+    // 🔧 确保设置src在crossOrigin之后
     img.src = imageDataUrl;
   }, [handle3DGenerateFromCanvas]);
 
@@ -188,6 +213,9 @@ const Whiteboard = ({
     console.log('🎯 [handleImageUploaded] Canvas found:', canvas);
 
     const img = new Image();
+    
+    // 🔧 设置crossOrigin防止canvas污染（虽然上传的图片通常是本地的）
+    img.crossOrigin = 'anonymous';
     
     img.onload = () => {
       console.log('✅ [handleImageUploaded] Image loaded successfully:', img.width, 'x', img.height);
@@ -210,7 +238,9 @@ const Whiteboard = ({
         scaleY: 1.0,  // 调整到1.0，显示原始大小
         selectable: true,
         hasControls: true,
-        evented: true
+        evented: true,
+        // 🔧 确保fabric图片也不会污染canvas
+        crossOrigin: 'anonymous'
       });
 
       console.log('🎨 [handleImageUploaded] FabricImage created:', fabricImage);
