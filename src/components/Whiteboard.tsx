@@ -4,6 +4,7 @@ import './Whiteboard.css'; // 重新启用CSS
 // import Toolbar from './Toolbar'; // 移除Toolbar
 import { AIGenerationPanel } from './AIGeneration/AIGenerationPanel';
 import { LogViewer } from './LogViewer/LogViewer';
+import { Tripo3DPanel } from './Tripo3D/Tripo3DPanel'; // 新增Tripo3D面板
 import FloatingMenu from './FloatingMenu/FloatingMenu';
 import ImageUploader from './ImageUpload/ImageUploader';
 import { ProcessedImage } from './ImageUpload/ImageProcessor';
@@ -48,6 +49,10 @@ const Whiteboard = ({
   const [floatingMenuPosition, setFloatingMenuPosition] = useState<{x: number, y: number} | null>(null);
   const [showImageUploader, setShowImageUploader] = useState(false);
   const [isDrawingMode, setIsDrawingMode] = useState(true); // 添加绘图模式状态
+
+  // State for Tripo 3D generation
+  const [isTripo3DOpen, setIsTripo3DOpen] = useState(false);
+  const [tripo3DSnapshot, setTripo3DSnapshot] = useState<string>('');
 
   // 🔍 组件渲染监控 - 暂时注释掉避免编译错误
   // console.log('🔄 [Whiteboard] Component RENDER - brushSize:', brushSize, 'timestamp:', Date.now());
@@ -350,6 +355,36 @@ const Whiteboard = ({
     setFloatingMenuPosition(null); // 关闭菜单
   }, [floatingMenuPosition]);
 
+  // 处理3D生成
+  const handle3DGenerate = useCallback(() => {
+    console.log('🎲 [handle3DGenerate] Generating 3D model from canvas...');
+    
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) {
+      console.error('[Whiteboard] Canvas not available for 3D generation');
+      return;
+    }
+
+    // 生成画布快照
+    const dataURL = canvas.toDataURL({
+      format: 'png',
+      quality: 0.8,
+      multiplier: 1
+    });
+    
+    setTripo3DSnapshot(dataURL);
+    setIsTripo3DOpen(true);
+    setFloatingMenuPosition(null); // 关闭菜单
+    
+    console.log('✅ [handle3DGenerate] Canvas snapshot created, opening 3D panel');
+  }, []);
+
+  // 处理3D模型生成完成
+  const handle3DModelGenerated = useCallback((modelUrl: string, format: string) => {
+    console.log('🎉 [handle3DModelGenerated] 3D model generated:', modelUrl, format);
+    // 这里可以添加后续处理，比如将模型添加到画布或显示预览
+  }, []);
+
   // --- Effects ---
 
   // Effect for initializing and managing the Fabric canvas instance
@@ -497,9 +532,21 @@ const Whiteboard = ({
             console.log('📝 FloatingMenu sticky note clicked');
             handleStickyNoteCreated();
           }}
+          on3DGenerateClick={() => {
+            console.log('🎲 FloatingMenu 3D generate clicked');
+            handle3DGenerate();
+          }}
           onClose={() => setFloatingMenuPosition(null)}
         />
       )}
+
+      {/* Tripo 3D生成面板 */}
+      <Tripo3DPanel
+        isOpen={isTripo3DOpen}
+        onClose={() => setIsTripo3DOpen(false)}
+        canvasSnapshot={tripo3DSnapshot}
+        onModelGenerated={handle3DModelGenerated}
+      />
 
       {/* 图片上传器 */}
       {showImageUploader && (
