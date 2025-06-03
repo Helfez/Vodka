@@ -187,6 +187,17 @@ const Whiteboard = ({
         console.log('📐 [Whiteboard] DOM canvas size:', canvasEl.width, 'x', canvasEl.height);
         console.log('📐 [Whiteboard] DOM canvas style size:', canvasEl.style.width, 'x', canvasEl.style.height);
         console.log('📐 [Whiteboard] Fabric canvas size:', canvasInstance.getWidth(), 'x', canvasInstance.getHeight());
+        
+        // 🔍 检查是否有多个canvas元素
+        const allCanvases = document.querySelectorAll('canvas');
+        console.log('🔍 [Whiteboard] Total canvas elements in DOM:', allCanvases.length);
+        allCanvases.forEach((canvas, index) => {
+          console.log(`📍 [Whiteboard] Canvas ${index}:`, canvas.width, 'x', canvas.height, 'visible:', canvas.style.display !== 'none');
+        });
+        
+        // 🔍 检查canvas的父容器
+        const container = canvasEl.parentElement;
+        console.log('📍 [Whiteboard] Canvas container:', container?.className, 'size:', container?.offsetWidth, 'x', container?.offsetHeight);
       }
       
       // 强制渲染确保路径显示 - 多次调用确保生效
@@ -196,17 +207,54 @@ const Whiteboard = ({
       // 🔍 强制刷新canvas显示
       canvasInstance.requestRenderAll();
       
+      // 🔍 检查canvas的内部状态
+      console.log('🔍 [Whiteboard] Canvas context state:');
+      console.log('   - isDrawingMode:', canvasInstance.isDrawingMode);
+      console.log('   - selection:', canvasInstance.selection);
+      console.log('   - renderOnAddRemove:', canvasInstance.renderOnAddRemove);
+      
+      // 🔧 关键修复：在路径创建后立即保存状态
+      const allObjects = canvasInstance.getObjects();
+      const savedState = JSON.stringify(canvasInstance.toJSON());
+      console.log('💾 [Whiteboard] Saved canvas state with', allObjects.length, 'objects');
+      
       // 🔍 检查路径是否真的可见
       setTimeout(() => {
         const objects = canvasInstance.getObjects();
         console.log('🔍 [Whiteboard] Objects after render:', objects.length);
+        
+        // 🔧 如果对象消失了，恢复状态
+        if (objects.length < allObjects.length) {
+          console.log('🔧 [Whiteboard] Objects disappeared! Restoring state...');
+          canvasInstance.loadFromJSON(savedState, () => {
+            canvasInstance.renderAll();
+            console.log('✅ [Whiteboard] State restored successfully');
+          });
+          return;
+        }
+        
         objects.forEach((obj, index) => {
-          console.log(`📍 [Whiteboard] Object ${index}:`, obj.type, 'visible:', obj.visible, 'opacity:', obj.opacity);
+          console.log(`📍 [Whiteboard] Object ${index}:`, obj.type, 'visible:', obj.visible, 'opacity:', obj.opacity, 'left:', obj.left, 'top:', obj.top);
+          
+          // 🔍 强制设置对象为可见
+          if (!obj.visible || obj.opacity === 0) {
+            console.log('🔧 [Whiteboard] Fixing invisible object:', index);
+            obj.set({ visible: true, opacity: 1 });
+          }
         });
         
         // 🎨 再次强制渲染
         canvasInstance.renderAll();
         console.log('🎨 [Whiteboard] Second force render completed');
+        
+        // 🔍 检查canvas的像素数据是否有内容
+        try {
+          const imageData = canvasInstance.getContext().getImageData(0, 0, 100, 100);
+          const hasContent = Array.from(imageData.data).some((value, index) => index % 4 !== 3 && value !== 254); // 检查非alpha通道
+          console.log('🔍 [Whiteboard] Canvas has visual content:', hasContent);
+        } catch (error) {
+          console.log('🔍 [Whiteboard] Could not check canvas content:', error);
+        }
       }, 50);
       
       // 立即检查对象是否被添加
