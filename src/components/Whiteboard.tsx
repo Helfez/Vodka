@@ -6,6 +6,7 @@ import { AIGenerationPanel } from './AIGeneration/AIGenerationPanel';
 import { LogViewer } from './LogViewer/LogViewer';
 import FloatingMenu from './FloatingMenu/FloatingMenu';
 import ImageUploader from './ImageUpload/ImageUploader';
+import { ProcessedImage } from './ImageUpload/ImageProcessor';
 
 // Type alias for Fabric.js Canvas instance with custom properties if any
 interface FabricCanvas extends fabric.Canvas {
@@ -126,7 +127,7 @@ const Whiteboard = ({
   }, []);
 
   // 处理图片上传
-  const handleImageUploaded = useCallback((processedImage: {dataUrl: string, width: number, height: number}) => {
+  const handleImageUploaded = useCallback((processedImage: ProcessedImage) => {
     const canvas = fabricCanvasRef.current;
     if (!canvas) {
       console.error('[Whiteboard] Canvas not available for image upload');
@@ -154,19 +155,7 @@ const Whiteboard = ({
     setShowImageUploader(false); // 关闭上传器
   }, [floatingMenuPosition]);
 
-  // 处理右键点击
-  const handleCanvasRightClick = useCallback((e: MouseEvent) => {
-    e.preventDefault();
-    const rect = canvasElRef.current?.getBoundingClientRect();
-    if (rect) {
-      setFloatingMenuPosition({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      });
-    }
-  }, []);
-
-  // --- Effects --- 
+  // --- Effects ---
 
   // Effect for initializing and managing the Fabric canvas instance
   useEffect(() => {
@@ -177,6 +166,9 @@ const Whiteboard = ({
       return;
     }
 
+    // 复制canvasElRef.current到局部变量，避免在cleanup中访问可能已变化的ref
+    const canvasElement = canvasElRef.current;
+
     // 如果已存在canvas实例，先清理
     if (fabricCanvasRef.current) {
       console.log('🧹 [Whiteboard] Disposing existing canvas instance');
@@ -185,7 +177,7 @@ const Whiteboard = ({
     }
 
     // 创建新的 Fabric.js 画布实例 - 最简配置
-    const canvasInstance = new fabric.Canvas(canvasElRef.current, {
+    const canvasInstance = new fabric.Canvas(canvasElement, {
         width,
         height,
       backgroundColor: '#fefcf8',
@@ -193,13 +185,11 @@ const Whiteboard = ({
       }) as FabricCanvas;
 
     // 🔧 强制设置DOM canvas元素尺寸，确保与Fabric实例匹配
-    if (canvasElRef.current) {
-      canvasElRef.current.width = width;
-      canvasElRef.current.height = height;
-      canvasElRef.current.style.width = width + 'px';
-      canvasElRef.current.style.height = height + 'px';
-      console.log('🔧 [Whiteboard] Forced DOM canvas size to match Fabric:', width, 'x', height);
-    }
+    canvasElement.width = width;
+    canvasElement.height = height;
+    canvasElement.style.width = width + 'px';
+    canvasElement.style.height = height + 'px';
+    console.log('🔧 [Whiteboard] Forced DOM canvas size to match Fabric:', width, 'x', height);
 
     // 设置画笔 - 最简配置
     const brush = new fabric.PencilBrush(canvasInstance);
@@ -208,9 +198,16 @@ const Whiteboard = ({
     canvasInstance.freeDrawingBrush = brush;
     
     // 添加右键事件监听器
-    if (canvasElRef.current) {
-      canvasElRef.current.addEventListener('contextmenu', handleCanvasRightClick);
-    }
+    const rightClickHandler = (e: MouseEvent) => {
+      e.preventDefault();
+      const rect = canvasElement.getBoundingClientRect();
+      setFloatingMenuPosition({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    };
+    
+    canvasElement.addEventListener('contextmenu', rightClickHandler);
     
     // 🔧 移除所有事件监听器，只保留基本功能
     console.log('✅ [Whiteboard] Minimal canvas setup completed');
@@ -220,15 +217,13 @@ const Whiteboard = ({
     // 简化的清理函数
     return () => {
       console.log('🧹 [Whiteboard] Cleaning up canvas');
-      if (canvasElRef.current) {
-        canvasElRef.current.removeEventListener('contextmenu', handleCanvasRightClick);
-      }
+      canvasElement.removeEventListener('contextmenu', rightClickHandler);
       if (canvasInstance && fabricCanvasRef.current === canvasInstance) {
         canvasInstance.dispose();
         fabricCanvasRef.current = null;
       }
     };
-  }, [width, height, handleCanvasRightClick]); // 添加handleCanvasRightClick依赖
+  }, [width, height]);
 
   return (
     <div className="whiteboard-wrapper">
