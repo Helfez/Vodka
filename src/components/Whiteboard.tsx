@@ -182,6 +182,8 @@ const Whiteboard = ({
         height,
       backgroundColor: '#fefcf8',
         isDrawingMode: true, // 直接启用绘图模式
+        stopContextMenu: true, // 阻止原生右键菜单
+        fireRightClick: true,  // 启用右键事件
       }) as FabricCanvas;
 
     // 🔧 强制设置DOM canvas元素尺寸，确保与Fabric实例匹配
@@ -197,18 +199,28 @@ const Whiteboard = ({
     brush.color = '#000000';
     canvasInstance.freeDrawingBrush = brush;
     
-    // 添加右键事件监听器
-    const rightClickHandler = (e: MouseEvent) => {
-      e.preventDefault();
-      const rect = canvasElement.getBoundingClientRect();
-      setFloatingMenuPosition({
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      });
+    // 使用fabric.js的事件系统处理右键点击
+    const rightClickHandler = (opt: any) => {
+      if (opt.e instanceof MouseEvent && opt.e.button === 2) {
+        opt.e.preventDefault();
+        const rect = canvasElement.getBoundingClientRect();
+        setFloatingMenuPosition({
+          x: opt.e.clientX - rect.left,
+          y: opt.e.clientY - rect.top
+        });
+      }
     };
     
-    canvasElement.addEventListener('contextmenu', rightClickHandler);
+    // 添加fabric事件监听器
+    canvasInstance.on('mouse:down', rightClickHandler);
     
+    // 额外确保阻止DOM的contextmenu事件
+    const domContextMenuHandler = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    canvasElement.addEventListener('contextmenu', domContextMenuHandler, { capture: true });
+
     // 🔧 移除所有事件监听器，只保留基本功能
     console.log('✅ [Whiteboard] Minimal canvas setup completed');
 
@@ -217,7 +229,8 @@ const Whiteboard = ({
     // 简化的清理函数
     return () => {
       console.log('🧹 [Whiteboard] Cleaning up canvas');
-      canvasElement.removeEventListener('contextmenu', rightClickHandler);
+      canvasElement.removeEventListener('contextmenu', domContextMenuHandler);
+      canvasInstance.off('mouse:down', rightClickHandler);
       if (canvasInstance && fabricCanvasRef.current === canvasInstance) {
         canvasInstance.dispose();
         fabricCanvasRef.current = null;
