@@ -47,6 +47,7 @@ const Whiteboard = ({
   // State for floating menu (right-click upload)
   const [floatingMenuPosition, setFloatingMenuPosition] = useState<{x: number, y: number} | null>(null);
   const [showImageUploader, setShowImageUploader] = useState(false);
+  const [isDrawingMode, setIsDrawingMode] = useState(true); // 添加绘图模式状态
 
   // 🔍 组件渲染监控 - 暂时注释掉避免编译错误
   // console.log('🔄 [Whiteboard] Component RENDER - brushSize:', brushSize, 'timestamp:', Date.now());
@@ -58,6 +59,19 @@ const Whiteboard = ({
   // 移除未使用的generateCanvasSnapshot函数 - 现在都用内联生成
   // 移除未使用的handleUndo函数 - 现在都用内联处理
   // 移除未使用的manageSelectionRect函数 - 现在都用内联管理
+
+  // 切换绘图/选择模式
+  const toggleDrawingMode = useCallback(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) return;
+    
+    const newDrawingMode = !isDrawingMode;
+    setIsDrawingMode(newDrawingMode);
+    canvas.isDrawingMode = newDrawingMode;
+    
+    console.log('🔄 [Whiteboard] Drawing mode:', newDrawingMode ? 'ON' : 'OFF');
+    canvas.renderAll();
+  }, [isDrawingMode]);
 
   // --- Callbacks ---
 
@@ -176,7 +190,15 @@ const Whiteboard = ({
         // 然后应用拍立得特效
         console.log('✨ [handleImageUploaded] Applying PhotoEffect...');
         PhotoEffect.applyPhotoEffect(fabricImage);
-        console.log('✅ [handleImageUploaded] PhotoEffect applied successfully');
+        
+        // 重新启用图片交互性，允许拖拽和缩放
+        fabricImage.set({
+          selectable: true,
+          hasControls: true,
+          evented: true
+        });
+        
+        console.log('✅ [handleImageUploaded] PhotoEffect applied and interactivity restored');
         
         canvas.renderAll();
         console.log('🖌️ [handleImageUploaded] Canvas rendered');
@@ -206,6 +228,76 @@ const Whiteboard = ({
     
     setFloatingMenuPosition(null); // 关闭菜单
     setShowImageUploader(false); // 关闭上传器
+  }, [floatingMenuPosition]);
+
+  // 处理便签创建
+  const handleStickyNoteCreated = useCallback(() => {
+    console.log('📝 [handleStickyNoteCreated] Creating sticky note...');
+    
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) {
+      console.error('[Whiteboard] Canvas not available for sticky note creation');
+      return;
+    }
+
+    // 计算canvas坐标
+    let canvasX = 100;
+    let canvasY = 100;
+    
+    if (floatingMenuPosition && canvasElRef.current) {
+      const rect = canvasElRef.current.getBoundingClientRect();
+      canvasX = floatingMenuPosition.x - rect.left;
+      canvasY = floatingMenuPosition.y - rect.top;
+    }
+
+    // 创建便签背景（蓝色矩形）
+    const stickyBg = new fabric.Rect({
+      left: canvasX,
+      top: canvasY,
+      width: 200,
+      height: 200,
+      fill: '#4FC3F7', // 蓝色背景
+      stroke: '#29B6F6',
+      strokeWidth: 2,
+      rx: 8, // 圆角
+      ry: 8,
+      shadow: new fabric.Shadow({
+        color: 'rgba(0, 0, 0, 0.2)',
+        blur: 10,
+        offsetX: 3,
+        offsetY: 3
+      }),
+      selectable: true,
+      hasControls: true,
+      evented: true
+    });
+
+    // 创建可编辑文本框
+    const stickyText = new fabric.IText('双击编辑文字', {
+      left: canvasX + 100, // 居中
+      top: canvasY + 100,  // 居中
+      fontFamily: 'Microsoft YaHei, Arial, sans-serif',
+      fontSize: 18,
+      fill: 'white',
+      textAlign: 'center',
+      originX: 'center',
+      originY: 'center',
+      width: 180,
+      selectable: true,
+      editable: true,
+      hasControls: false, // 文本不显示控制框，只有背景显示
+      lockMovementX: false,
+      lockMovementY: false
+    });
+
+    // 分别添加背景和文本
+    canvas.add(stickyBg);
+    canvas.add(stickyText);
+    canvas.renderAll();
+    
+    console.log('✅ [handleStickyNoteCreated] Sticky note created with separate bg and text');
+    
+    setFloatingMenuPosition(null); // 关闭菜单
   }, [floatingMenuPosition]);
 
   // --- Effects ---
@@ -312,6 +404,13 @@ const Whiteboard = ({
         >
           📊 日志
         </button>
+        <button 
+          className="ai-generation-btn"
+          onClick={toggleDrawingMode}
+          title={isDrawingMode ? "切换到选择模式（可拖拽图片）" : "切换到绘图模式"}
+        >
+          {isDrawingMode ? '✏️ 绘图' : '👆 选择'}
+        </button>
       </div>
 
       <div className="whiteboard-main-content">
@@ -343,6 +442,10 @@ const Whiteboard = ({
           onUploadClick={() => {
             console.log('🔄 FloatingMenu upload clicked');
             setShowImageUploader(true);
+          }}
+          onStickyNoteClick={() => {
+            console.log('📝 FloatingMenu sticky note clicked');
+            handleStickyNoteCreated();
           }}
           onClose={() => setFloatingMenuPosition(null)}
         />

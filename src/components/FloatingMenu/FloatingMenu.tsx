@@ -4,12 +4,14 @@ import './FloatingMenu.css';
 interface FloatingMenuProps {
   position: { x: number; y: number };
   onUploadClick: () => void;
+  onStickyNoteClick: () => void;
   onClose: () => void;
 }
 
 const FloatingMenu: React.FC<FloatingMenuProps> = ({
   position,
   onUploadClick,
+  onStickyNoteClick,
   onClose
 }) => {
   return (
@@ -21,7 +23,10 @@ const FloatingMenu: React.FC<FloatingMenuProps> = ({
       }}
     >
       <button onClick={onUploadClick}>
-        上传图片
+        📷 上传图片
+      </button>
+      <button onClick={onStickyNoteClick}>
+        📝 便签
       </button>
       <button className="close-button" onClick={onClose}>
         ×
