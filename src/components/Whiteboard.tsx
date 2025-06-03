@@ -29,7 +29,7 @@ const Whiteboard = ({
 
   // State for UI elements and drawing properties
   const [brushSize, setBrushSize] = useState(5);
-  const [brushColor] = useState('#000000'); // 暂时注释掉
+  // const [brushColor] = useState('#000000'); // 注释掉未使用的变量
   
   // State for AI generation panel - isAIGenerationOpen might not be needed if panel is fully replaced
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -54,10 +54,10 @@ const Whiteboard = ({
 
   // --- Callbacks ---
 
-  // Handler for brush size changes
-  const handleBrushSizeChange = useCallback((newSize: number) => {
-    setBrushSize(newSize);
-  }, []);
+  // Handler for brush size changes - 注释掉未使用的函数
+  // const handleBrushSizeChange = useCallback((newSize: number) => {
+  //   setBrushSize(newSize);
+  // }, []);
 
   // AI生成面板处理
   const handleOpenAIPanel = useCallback(() => {
