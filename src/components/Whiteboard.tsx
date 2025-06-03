@@ -28,7 +28,7 @@ const Whiteboard = ({
   const fabricCanvasRef = useRef<FabricCanvas | null>(null);
 
   // State for UI elements and drawing properties
-  const [brushSize, setBrushSize] = useState(5);
+  // const [brushSize, setBrushSize] = useState(5); // 暂时注释掉
   // const [brushColor] = useState('#000000'); // 暂时注释掉
   
   // State for AI generation panel - isAIGenerationOpen might not be needed if panel is fully replaced
@@ -41,8 +41,8 @@ const Whiteboard = ({
   // State for log viewer
   const [isLogViewerOpen, setIsLogViewerOpen] = useState(false);
 
-  // 🔍 组件渲染监控 - 关键：检测是否因为StrictMode导致重复渲染
-  console.log('🔄 [Whiteboard] Component RENDER - brushSize:', brushSize, 'timestamp:', Date.now());
+  // 🔍 组件渲染监控 - 暂时注释掉避免编译错误
+  // console.log('🔄 [Whiteboard] Component RENDER - brushSize:', brushSize, 'timestamp:', Date.now());
 
   // --- Helper Functions ---
   
