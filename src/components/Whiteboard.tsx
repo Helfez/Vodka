@@ -19,8 +19,8 @@ interface WhiteboardProps {
 
 // Whiteboard component: Main component for the drawing canvas
 const Whiteboard = ({ 
-  width = 800, 
-  height = 600, 
+  width = 900,  // 修复：与CSS容器尺寸匹配
+  height = 650, // 修复：与CSS容器尺寸匹配
   isDrawingMode: initialIsDrawingMode = true // Renamed prop to avoid conflict with canvas property
 }: WhiteboardProps) => {
   // Refs for canvas DOM element and Fabric canvas instance
@@ -169,6 +169,10 @@ const Whiteboard = ({
       console.log('📐 [Whiteboard] Path object:', e.path);
       console.log('📊 [Whiteboard] Canvas objects BEFORE adding path:', canvasInstance.getObjects().length);
       
+      // 强制渲染确保路径显示
+      canvasInstance.renderAll();
+      console.log('🎨 [Whiteboard] Force render after path creation');
+      
       // 立即检查对象是否被添加
       setTimeout(() => {
         const objectCount = canvasInstance.getObjects().length;
@@ -286,6 +290,8 @@ const Whiteboard = ({
     fabricCanvasRef.current = canvasInstance;
     
     console.log('✅ [Whiteboard] Canvas initialization completed successfully');
+    console.log('📐 [Whiteboard] Canvas size:', canvasInstance.getWidth(), 'x', canvasInstance.getHeight());
+    console.log('📐 [Whiteboard] Expected size:', width, 'x', height);
 
     // 清理函数
     return () => {
