@@ -29,7 +29,7 @@ const Whiteboard = ({
 
   // State for UI elements and drawing properties
   const [brushSize, setBrushSize] = useState(5);
-  const [brushColor, setBrushColor] = useState('#000000');
+  const [brushColor] = useState('#000000'); // 移除setBrushColor，暂时不需要
   
   // State for AI generation panel - isAIGenerationOpen might not be needed if panel is fully replaced
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -56,27 +56,7 @@ const Whiteboard = ({
     setBrushSize(newSize);
   }, []);
 
-  // 清空画布函数
-  const clearCanvas = useCallback(() => {
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) {
-      console.warn('[Whiteboard] Cannot clear: canvas not available');
-      return;
-    }
-
-    console.log('🧹 [Whiteboard] Clearing canvas manually');
-    canvas.clear();
-    
-    // 重新设置画布的绘图模式和画笔
-    canvas.isDrawingMode = initialIsDrawingMode;
-    const brush = new fabric.PencilBrush(canvas);
-    brush.width = brushSize;
-    brush.color = brushColor;
-    (brush as any).decimate = 8;
-    (brush as any).controlPointsNum = 2;
-    canvas.freeDrawingBrush = brush;
-    canvas.renderAll();
-  }, [initialIsDrawingMode, brushSize, brushColor]);
+  // 删除clearCanvas函数 - 暂时不需要
 
   // AI生成面板处理
   const handleOpenAIPanel = useCallback(() => {
@@ -326,7 +306,7 @@ const Whiteboard = ({
         fabricCanvasRef.current = null;
       }
     };
-  }, [width, height, initialIsDrawingMode]); // 🔧 修复：只依赖canvas尺寸和绘图模式，不依赖画笔属性
+  }, [width, height, initialIsDrawingMode, brushSize, brushColor]); // 🔧 修复：添加画笔属性到依赖项
 
   // 🔧 修复画笔更新Effect - 添加详细LOG监控
   useEffect(() => {
