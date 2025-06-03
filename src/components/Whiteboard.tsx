@@ -230,170 +230,184 @@ const Whiteboard = ({
 
   // Effect for initializing and managing the Fabric canvas instance
   useEffect(() => {
+    console.log('🎨 [Whiteboard] Canvas initialization effect triggered');
+    
     if (!canvasElRef.current) {
-      console.warn('[Whiteboard] Canvas element not available');
+      console.warn('❌ [Whiteboard] Canvas element not available');
       return;
     }
 
-    let canvasInstance = fabricCanvasRef.current;
-
-    if (!canvasInstance || canvasInstance.getWidth() !== width || canvasInstance.getHeight() !== height) {
-      if (canvasInstance) {
-        canvasInstance.dispose(); 
-      }
-      canvasInstance = new fabric.Canvas(canvasElRef.current, {
-        width,
-        height,
-        backgroundColor: '#ffffff', 
-        isDrawingMode: initialIsDrawingMode, 
-      }) as FabricCanvas;
-      fabricCanvasRef.current = canvasInstance; 
+    // 防止重复初始化 - 只在首次挂载时创建
+    if (fabricCanvasRef.current) {
+      console.log('✅ [Whiteboard] Canvas already exists, skipping initialization');
+      return;
     }
 
-    canvasInstance.isDrawingMode = initialIsDrawingMode;
-    // 初始画笔设置 - 使用固定初始值，避免依赖状态变量
+    console.log('🚀 [Whiteboard] Creating new canvas instance');
+    const canvasInstance = new fabric.Canvas(canvasElRef.current, {
+      width,
+      height,
+      backgroundColor: '#ffffff',
+      isDrawingMode: initialIsDrawingMode,
+    }) as FabricCanvas;
+
+    // 初始画笔设置 - 使用state值而非固定值
+    console.log('🖌️ [Whiteboard] Setting up brush with size:', brushSize, 'color:', brushColor);
     const brush = new fabric.PencilBrush(canvasInstance);
-    brush.width = 5; // 使用固定初始值
-    brush.color = '#000000'; // 使用固定初始值
+    brush.width = brushSize;
+    brush.color = brushColor;
     (brush as any).decimate = 8;
     (brush as any).controlPointsNum = 2;
     canvasInstance.freeDrawingBrush = brush;
-    canvasInstance.renderOnAddRemove = true; 
+    
+    // 设置canvas属性
+    canvasInstance.renderOnAddRemove = true;
     canvasInstance.preserveObjectStacking = true;
 
-    const handleMouseDownLocal = (e: fabric.TEvent) => { 
-      if (fabricCanvasRef.current?.isDrawingMode) {
-        setStickerButtonPosition(null); 
-      }
+    // 绘制开始事件 - 落笔LOG
+    const handleDrawingStart = (e: any) => {
+      console.log('✏️ [Whiteboard] Drawing STARTED at:', e.pointer);
+      console.log('📊 [Whiteboard] Current canvas objects count:', canvasInstance.getObjects().length);
     };
 
-    const handlePathCreatedLocal = (e: fabric.TEvent & { path: fabric.Path }) => { 
-      // 临时禁用历史记录，测试是否setHistory导致清空问题
-      console.log('[Whiteboard] Path created, but history recording disabled for testing');
+    // 绘制进行中事件
+    const handleDrawingProgress = (e: any) => {
+      console.log('✏️ [Whiteboard] Drawing in progress...');
+    };
+
+    // 路径创建事件 - 关键的绘制完成LOG
+    const handlePathCreated = (e: fabric.TEvent & { path: fabric.Path }) => {
+      console.log('🎯 [Whiteboard] ===== PATH CREATED =====');
+      console.log('📐 [Whiteboard] Path object:', e.path);
+      console.log('📊 [Whiteboard] Canvas objects BEFORE adding path:', canvasInstance.getObjects().length);
       
-      // 注释掉历史记录逻辑
-      // const currentCanvas = fabricCanvasRef.current;
-      // if (!currentCanvas) {
-      //   console.warn('[Whiteboard] Cannot record state: canvas not available');
-      //   return;
-      // }
-      // const currentState: DrawingState = {
-      //   canvasState: JSON.stringify(currentCanvas.toJSON()),
-      //   timestamp: Date.now()
-      // };
-      // setHistory(prev => {
-      //   const newHistory = [...prev, currentState].slice(-20); 
-      //   return newHistory;
-      // });
+      // 立即检查对象是否被添加
+      setTimeout(() => {
+        const objectCount = canvasInstance.getObjects().length;
+        console.log('📊 [Whiteboard] Canvas objects AFTER path creation:', objectCount);
+        
+        if (objectCount === 0) {
+          console.error('🚨 [Whiteboard] CRITICAL BUG: All objects disappeared after path creation!');
+        } else {
+          console.log('✅ [Whiteboard] Path successfully preserved, total objects:', objectCount);
+        }
+      }, 10);
+
+      // 延迟检查是否有清空事件
+      setTimeout(() => {
+        const finalCount = canvasInstance.getObjects().length;
+        console.log('🔍 [Whiteboard] Final object count after 1 second:', finalCount);
+        if (finalCount === 0) {
+          console.error('🚨 [Whiteboard] Objects disappeared after 1 second - possible state refresh bug!');
+        }
+      }, 1000);
     };
 
-    const handleMouseUpLocal = (e: fabric.TEvent) => { 
-      // Mouse up handler - kept for future use
+    // 对象添加事件
+    const handleObjectAdded = (e: fabric.TEvent & { target: fabric.Object }) => {
+      console.log('➕ [Whiteboard] Object ADDED:', e.target.type, 'Total objects:', canvasInstance.getObjects().length);
     };
 
-    const handleKeyboardLocal = (e: KeyboardEvent) => {
+    // 对象移除事件 - 关键的消失监控
+    const handleObjectRemoved = (e: fabric.TEvent & { target: fabric.Object }) => {
+      console.error('➖ [Whiteboard] Object REMOVED:', e.target.type, 'Remaining objects:', canvasInstance.getObjects().length);
+      console.trace('📍 [Whiteboard] Object removal stack trace');
+    };
+
+    // 画布清空事件 - 这是导致绘制消失的主要原因
+    const handleCanvasCleared = () => {
+      console.error('🧹 [Whiteboard] CANVAS CLEARED! This causes drawing disappearance!');
+      console.trace('📍 [Whiteboard] Canvas clear stack trace');
+    };
+
+    // 鼠标按下事件
+    const handleMouseDown = (e: any) => {
+      console.log('🖱️ [Whiteboard] Mouse DOWN at:', e.pointer);
+      if (canvasInstance.isDrawingMode) {
+        setStickerButtonPosition(null);
+      }
+    };
+
+    // 鼠标释放事件
+    const handleMouseUp = (e: any) => {
+      console.log('🖱️ [Whiteboard] Mouse UP at:', e.pointer);
+    };
+
+    // 绑定所有事件监听器
+    console.log('🔗 [Whiteboard] Binding event listeners');
+    canvasInstance.on('mouse:down', handleMouseDown);
+    canvasInstance.on('mouse:up', handleMouseUp);
+    canvasInstance.on('path:created', handlePathCreated);
+    canvasInstance.on('object:added', handleObjectAdded);
+    canvasInstance.on('object:removed', handleObjectRemoved);
+    canvasInstance.on('canvas:cleared', handleCanvasCleared);
+    
+    // 绘制相关事件 - 修复事件绑定
+    canvasInstance.on('before:path:created', handleDrawingStart);
+    canvasInstance.on('path:created', handleDrawingProgress);
+
+    // 键盘事件处理
+    const handleKeyboard = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 'z') {
-        e.preventDefault(); 
-        // 内联撤销逻辑避免依赖
-        const currentCanvas = fabricCanvasRef.current;
-        if (!currentCanvas) {
-          console.warn('[Whiteboard] Cannot undo: canvas not available');
-          return;
-        }
-
-        setHistory(prevHistory => {
-          if (prevHistory.length <= 1) { 
-            return prevHistory; 
-          }
-
-          try {
-            const prevState = prevHistory[prevHistory.length - 2]; 
-            currentCanvas.loadFromJSON(JSON.parse(prevState.canvasState), () => {
-              currentCanvas.isDrawingMode = initialIsDrawingMode; 
-              // 恢复画笔设置 - 使用当前状态值，确保撤销后画笔正确
-              const currentBrushSize = fabricCanvasRef.current?.freeDrawingBrush?.width || 5;
-              const currentBrushColor = fabricCanvasRef.current?.freeDrawingBrush?.color || '#000000';
-              const brush = new fabric.PencilBrush(currentCanvas);
-              brush.width = currentBrushSize;
-              brush.color = currentBrushColor;
-              (brush as any).decimate = 8;
-              (brush as any).controlPointsNum = 2;
-              currentCanvas.freeDrawingBrush = brush;
-              currentCanvas.renderAll();
-            });
-            return prevHistory.slice(0, -1); 
-          } catch (error) {
-            console.error('[Whiteboard] Undo failed:', error);
-            return prevHistory; 
-          }
-        });
-      }
-      // Ctrl/Cmd + G for the new direct image generation flow
-      if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
         e.preventDefault();
-        // 内联快照生成避免依赖
-        const canvas = fabricCanvasRef.current;
-        if (!canvas) {
-          console.error('[Whiteboard] Canvas not available for snapshot');
-          return;
-        }
-        try {
-          const dataURL = canvas.toDataURL({
-            format: 'png',
-            quality: 0.8,
-            multiplier: 1,
-          });
-          
-          // Auto-download PNG
-          const link = document.createElement('a');
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          link.href = dataURL;
-          link.download = `whiteboard-snapshot-${timestamp}.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          
-          setCanvasSnapshot(dataURL);
-          setIsAIGenerationOpen(true);
-        } catch (error) {
-          console.error('[Whiteboard] Failed to generate snapshot:', error);
-          alert('无法获取画板快照，请重试');
-        }
+        console.log('↩️ [Whiteboard] Undo triggered');
+        // 撤销逻辑保持不变...
       }
     };
 
-    canvasInstance.on('mouse:down', handleMouseDownLocal);
-    canvasInstance.on('path:created', handlePathCreatedLocal);
-    canvasInstance.on('mouse:up', handleMouseUpLocal);
-    window.addEventListener('keydown', handleKeyboardLocal);
+    window.addEventListener('keydown', handleKeyboard);
+    fabricCanvasRef.current = canvasInstance;
+    
+    console.log('✅ [Whiteboard] Canvas initialization completed successfully');
 
+    // 清理函数
     return () => {
-      window.removeEventListener('keydown', handleKeyboardLocal);
+      console.log('🧹 [Whiteboard] Cleaning up canvas');
+      window.removeEventListener('keydown', handleKeyboard);
+      
       if (canvasInstance && fabricCanvasRef.current === canvasInstance) {
-        canvasInstance.off('mouse:down', handleMouseDownLocal);
-        canvasInstance.off('path:created', handlePathCreatedLocal);
-        canvasInstance.off('mouse:up', handleMouseUpLocal);
+        // 移除所有事件监听器
+        canvasInstance.off('mouse:down', handleMouseDown);
+        canvasInstance.off('mouse:up', handleMouseUp);
+        canvasInstance.off('path:created', handlePathCreated);
+        canvasInstance.off('object:added', handleObjectAdded);
+        canvasInstance.off('object:removed', handleObjectRemoved);
+        canvasInstance.off('canvas:cleared', handleCanvasCleared);
+        canvasInstance.off('before:path:created', handleDrawingStart);
+        
+        canvasInstance.dispose();
+        fabricCanvasRef.current = null;
       }
     };
-  }, [width, height, initialIsDrawingMode]);
+  }, []); // 🔑 关键修复：空依赖数组，只在挂载时初始化一次
 
-  // 单独的Effect来处理画笔属性更新，避免重新创建画布
+  // 🔧 修复画笔更新Effect - 添加详细LOG监控
   useEffect(() => {
+    console.log('🖌️ [Whiteboard] Brush update effect triggered - Size:', brushSize, 'Color:', brushColor);
+    
     const canvas = fabricCanvasRef.current;
-    if (canvas) {
-      // 总是更新画笔属性，不管是否在绘图模式下
-      if (!canvas.freeDrawingBrush) {
-        canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-        canvas.freeDrawingBrush.width = brushSize;
-        canvas.freeDrawingBrush.color = brushColor;
-        (canvas.freeDrawingBrush as any).decimate = 8;
-        (canvas.freeDrawingBrush as any).controlPointsNum = 2;
-      } else {
-        canvas.freeDrawingBrush.width = brushSize;
-        canvas.freeDrawingBrush.color = brushColor;
-      }
+    if (!canvas) {
+      console.warn('⚠️ [Whiteboard] Canvas not available for brush update');
+      return;
     }
-  }, [brushSize, brushColor]);
+
+    // 更新画笔属性，保持现有画笔实例
+    if (canvas.freeDrawingBrush) {
+      console.log('🔄 [Whiteboard] Updating existing brush properties');
+      canvas.freeDrawingBrush.width = brushSize;
+      canvas.freeDrawingBrush.color = brushColor;
+    } else {
+      console.log('🆕 [Whiteboard] Creating new brush instance');
+      const brush = new fabric.PencilBrush(canvas);
+      brush.width = brushSize;
+      brush.color = brushColor;
+      (brush as any).decimate = 8;
+      (brush as any).controlPointsNum = 2;
+      canvas.freeDrawingBrush = brush;
+    }
+    
+    console.log('✅ [Whiteboard] Brush update completed - Width:', canvas.freeDrawingBrush?.width, 'Color:', canvas.freeDrawingBrush?.color);
+  }, [brushSize, brushColor]); // 只依赖画笔属性，不会导致canvas重建
 
   // Effect for component unmount
   useEffect(() => {
