@@ -148,6 +148,15 @@ const Whiteboard = ({
       isDrawingMode: initialIsDrawingMode,
     }) as FabricCanvas;
 
+    // 🔧 强制设置DOM canvas元素尺寸，确保与Fabric实例匹配
+    if (canvasElRef.current) {
+      canvasElRef.current.width = width;
+      canvasElRef.current.height = height;
+      canvasElRef.current.style.width = width + 'px';
+      canvasElRef.current.style.height = height + 'px';
+      console.log('🔧 [Whiteboard] Forced DOM canvas size to match Fabric:', width, 'x', height);
+    }
+
     // 设置画笔 - 使用固定初始值，避免依赖状态变量
     const brush = new fabric.PencilBrush(canvasInstance);
     brush.width = 5; // 固定初始值
@@ -172,9 +181,33 @@ const Whiteboard = ({
       console.log('📐 [Whiteboard] Path object:', e.path);
       console.log('📊 [Whiteboard] Canvas objects BEFORE adding path:', canvasInstance.getObjects().length);
       
-      // 强制渲染确保路径显示
+      // 🔍 检查canvas DOM尺寸与Fabric尺寸是否匹配
+      const canvasEl = canvasElRef.current;
+      if (canvasEl) {
+        console.log('📐 [Whiteboard] DOM canvas size:', canvasEl.width, 'x', canvasEl.height);
+        console.log('📐 [Whiteboard] DOM canvas style size:', canvasEl.style.width, 'x', canvasEl.style.height);
+        console.log('📐 [Whiteboard] Fabric canvas size:', canvasInstance.getWidth(), 'x', canvasInstance.getHeight());
+      }
+      
+      // 强制渲染确保路径显示 - 多次调用确保生效
+      console.log('🎨 [Whiteboard] Force render BEFORE - objects visible check');
       canvasInstance.renderAll();
-      console.log('🎨 [Whiteboard] Force render after path creation');
+      
+      // 🔍 强制刷新canvas显示
+      canvasInstance.requestRenderAll();
+      
+      // 🔍 检查路径是否真的可见
+      setTimeout(() => {
+        const objects = canvasInstance.getObjects();
+        console.log('🔍 [Whiteboard] Objects after render:', objects.length);
+        objects.forEach((obj, index) => {
+          console.log(`📍 [Whiteboard] Object ${index}:`, obj.type, 'visible:', obj.visible, 'opacity:', obj.opacity);
+        });
+        
+        // 🎨 再次强制渲染
+        canvasInstance.renderAll();
+        console.log('🎨 [Whiteboard] Second force render completed');
+      }, 50);
       
       // 立即检查对象是否被添加
       setTimeout(() => {
@@ -194,6 +227,10 @@ const Whiteboard = ({
         console.log('🔍 [Whiteboard] Final object count after 1 second:', finalCount);
         if (finalCount === 0) {
           console.error('🚨 [Whiteboard] Objects disappeared after 1 second - possible state refresh bug!');
+        } else {
+          // 🔍 最终强制渲染检查
+          console.log('🎨 [Whiteboard] Final force render to ensure visibility');
+          canvasInstance.renderAll();
         }
       }, 1000);
     };
