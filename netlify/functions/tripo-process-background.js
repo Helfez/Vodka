@@ -121,29 +121,40 @@ export default async (request, context) => {
         const imageBuffer = Buffer.from(imageArrayBuffer);
         console.log(`[tripo-process-background] ✅ 任务 ${taskId}: 图片下载成功，大小: ${Math.round(imageBuffer.length / 1024)}KB`);
         
-        // 检测图片格式和文件名
-        const imageFormat = imageUrl.toLowerCase().includes('.png') ? 'png' : 
-                           imageUrl.toLowerCase().includes('.webp') ? 'webp' : 'jpeg';
-        const fileName = `image_${Date.now()}.${imageFormat}`;
-        console.log(`[tripo-process-background] 📋 任务 ${taskId}: 检测图片格式: ${imageFormat}, 文件名: ${fileName}`);
+        // 检测图片格式和文件名 - 直接使用JPEG格式
+        const imageFormat = 'jpeg';  // 确定是JPG/JPEG格式
+        const fileName = `image_${Date.now()}.jpg`;
+        console.log(`[tripo-process-background] 📋 任务 ${taskId}: 使用JPEG格式，文件名: ${fileName}`);
 
         // 第二步：直接上传到Tripo获取image_token
         console.log(`[tripo-process-background] 📤 任务 ${taskId}: 第二步 - 直接上传获取image_token`);
         
-        const FormData = (await import('form-data')).default;
-        const formData = new FormData();
-        formData.append('file', imageBuffer, {
-            filename: fileName,
-            contentType: `image/${imageFormat}`,
-        });
+        // 手动构建multipart/form-data
+        const boundary = `----formdata-tripo-${Date.now()}`;
+        const CRLF = '\r\n';
+        
+        const formDataBuffer = Buffer.concat([
+            Buffer.from(`--${boundary}${CRLF}`),
+            Buffer.from(`Content-Disposition: form-data; name="file"; filename="${fileName}"${CRLF}`),
+            Buffer.from(`Content-Type: image/${imageFormat}${CRLF}${CRLF}`),
+            imageBuffer,
+            Buffer.from(`${CRLF}--${boundary}--${CRLF}`)
+        ]);
+
+        console.log(`[tripo-process-background] 📋 任务 ${taskId}: FormData构建完成`);
+        console.log(`  - 文件名: ${fileName}`);
+        console.log(`  - 内容类型: image/${imageFormat}`);
+        console.log(`  - 文件大小: ${Math.round(imageBuffer.length / 1024)}KB`);
+        console.log(`  - FormData大小: ${Math.round(formDataBuffer.length / 1024)}KB`);
 
         const uploadResponse = await fetch('https://api.tripo3d.ai/v2/openapi/upload/sts', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${tripoApiKey}`,
-                ...formData.getHeaders()
+                'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                'Content-Length': formDataBuffer.length.toString()
             },
-            body: formData
+            body: formDataBuffer
         });
 
         if (!uploadResponse.ok) {
