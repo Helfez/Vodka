@@ -251,11 +251,11 @@ const Whiteboard = ({
       isDrawingMode: initialIsDrawingMode,
     }) as FabricCanvas;
 
-    // 初始画笔设置 - 使用state值而非固定值
-    console.log('🖌️ [Whiteboard] Setting up brush with size:', brushSize, 'color:', brushColor);
+    // 初始画笔设置 - 使用初始固定值，后续通过另一个effect更新
+    console.log('🖌️ [Whiteboard] Setting up initial brush');
     const brush = new fabric.PencilBrush(canvasInstance);
-    brush.width = brushSize;
-    brush.color = brushColor;
+    brush.width = 5; // 初始固定值
+    brush.color = '#000000'; // 初始固定值
     (brush as any).decimate = 8;
     (brush as any).controlPointsNum = 2;
     canvasInstance.freeDrawingBrush = brush;
@@ -344,7 +344,6 @@ const Whiteboard = ({
     
     // 绘制相关事件 - 修复事件绑定
     canvasInstance.on('before:path:created', handleDrawingStart);
-    canvasInstance.on('path:created', handleDrawingProgress);
 
     // 键盘事件处理
     const handleKeyboard = (e: KeyboardEvent) => {
@@ -379,7 +378,7 @@ const Whiteboard = ({
         fabricCanvasRef.current = null;
       }
     };
-  }, []); // 🔑 关键修复：空依赖数组，只在挂载时初始化一次
+  }, [width, height, initialIsDrawingMode]); // 🔧 修复：只依赖canvas尺寸和绘图模式，不依赖画笔属性
 
   // 🔧 修复画笔更新Effect - 添加详细LOG监控
   useEffect(() => {
