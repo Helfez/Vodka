@@ -133,7 +133,7 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [canvasSnapshot, systemPrompt, isGenerating]); // 简化依赖项
+  }, [canvasSnapshot, systemPrompt, isGenerating, visionService, dalleService, onImageGenerated, onClose]); // 添加所有依赖项
 
   // 面板打开时自动开始生成（只执行一次）
   useEffect(() => {
@@ -148,7 +148,7 @@ export const AIGenerationPanel: React.FC<AIGenerationPanelProps> = ({
       hasStartedRef.current = false;
       setIsGenerating(false);
     }
-  }, [isOpen, canvasSnapshot, systemPrompt]); // 移除handleOneClickGenerate依赖
+  }, [isOpen, canvasSnapshot, systemPrompt, isGenerating, handleOneClickGenerate]); // 添加所有依赖项
 
   // 不渲染任何UI
   return null;
