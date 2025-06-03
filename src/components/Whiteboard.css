@@ -92,39 +92,10 @@
   flex-shrink: 0;
 }
 
-/* 手账纸张边框装饰 - 暂时禁用，可能遮挡canvas */
-.whiteboard-container::before {
-  content: '';
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  border: 1px solid rgba(139, 90, 60, 0.15);
-  border-radius: 12px;
-  pointer-events: none;
-  z-index: -1; /* 移到canvas下层 */
-  display: none; /* 暂时完全禁用 */
-}
-
-/* 手账装订线效果 - 暂时禁用，可能遮挡canvas */
+/* 手账纸张边框装饰 - 完全移除 */
+.whiteboard-container::before,
 .whiteboard-container::after {
-  content: '';
-  position: absolute;
-  left: 45px;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(139, 90, 60, 0.15) 0px,
-    rgba(139, 90, 60, 0.15) 25px,
-    transparent 25px,
-    transparent 35px
-  );
-  z-index: -1; /* 移到canvas下层 */
-  pointer-events: none;
-  display: none; /* 暂时完全禁用 */
+  display: none;
 }
 
 /* 画布包装器 */
@@ -134,22 +105,18 @@
   height: 100%;
   border-radius: 14px;
   overflow: hidden;
-  z-index: 10; /* 提高层级 */
 }
 
-/* 画布样式 */
+/* 画布样式 - 简化并移除过度的!important */
 .whiteboard-container canvas {
-  display: block !important;
+  display: block;
   touch-action: none;
   cursor: crosshair;
   border-radius: 14px;
-  background: #fefcf8 !important;
+  background: #fefcf8;
   position: relative;
-  z-index: 100 !important; /* 大幅提高z-index，确保在最上层 */
-  width: 100% !important;
-  height: 100% !important;
-  opacity: 1 !important;
-  visibility: visible !important;
+  width: 100%;
+  height: 100%;
 }
 
 /* 手账风格的撤销按钮定位 */
@@ -165,7 +132,7 @@
   position: absolute;
   top: 18px;
   right: 18px;
-  z-index: 100;
+  z-index: 20;
   display: flex;
   gap: 10px;
 }
@@ -235,7 +202,7 @@
   box-shadow: -8px 0 24px rgba(139, 90, 60, 0.12);
   display: flex;
   flex-direction: column;
-  z-index: 50;
+  z-index: 30;
   border-radius: 16px 0 0 16px;
   overflow: hidden;
 }
