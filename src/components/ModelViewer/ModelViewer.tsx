@@ -126,11 +126,19 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
         throw new Error(`不支持的模型格式: ${format}`);
       }
 
+      // 如果是外部URL（如Tripo3D），使用代理
+      let actualUrl = url;
+      if (url.includes('tripo3d.com') || url.includes('tripo-data.rgl.data')) {
+        const proxyUrl = `${window.location.origin}/.netlify/functions/model-proxy?url=${encodeURIComponent(url)}`;
+        actualUrl = proxyUrl;
+        console.log('[ModelViewer] 🔗 使用代理URL:', proxyUrl);
+      }
+
       // 设置加载进度回调
       const loadedModel = await new Promise((resolve, reject) => {
         if (loader instanceof GLTFLoader) {
           loader.load(
-            url,
+            actualUrl,
             (gltf) => {
               console.log('[ModelViewer] ✅ GLB/GLTF模型加载成功');
               resolve(gltf.scene);
@@ -147,7 +155,7 @@ export const ModelViewer: React.FC<ModelViewerProps> = ({
           );
         } else if (loader instanceof OBJLoader) {
           loader.load(
-            url,
+            actualUrl,
             (obj) => {
               console.log('[ModelViewer] ✅ OBJ模型加载成功');
               resolve(obj);
