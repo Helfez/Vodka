@@ -158,8 +158,8 @@ const Whiteboard = ({
       const fabricImage = new fabric.Image(img, {
         left: canvasX,
         top: canvasY,
-        scaleX: 0.3,
-        scaleY: 0.3,
+        scaleX: 0.8,  // 从0.3调整到0.8，显示更大
+        scaleY: 0.8,  // 从0.3调整到0.8，显示更大
         selectable: true,
         hasControls: true,
         evented: true
