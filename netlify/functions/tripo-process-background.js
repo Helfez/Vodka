@@ -1,7 +1,7 @@
 import { getStore } from '@netlify/blobs';
 
 export default async (request, context) => {
-    console.log('[tripo-process-background] === Tripo后台处理函数启动 ===');
+    console.log('[tripo-process-background] 🎯 后台处理函数启动');
     
     const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
@@ -38,7 +38,7 @@ export default async (request, context) => {
         });
     }
 
-    console.log(`[tripo-process-background] 🔄 开始处理任务: ${taskId}`);
+    console.log(`[tripo-process-background] 📋 处理任务: ${taskId}`);
 
     let store;
     try {
@@ -89,7 +89,7 @@ export default async (request, context) => {
         await store.setJSON(taskId, {
             ...taskDataFromBlob,
             status: 'failed',
-            error: 'Tripo API密钥未配置',
+            error: 'Tripo API密钥未配置，请在Netlify环境变量中设置TRIPO_API_KEY',
             failedAt: new Date().toISOString()
         });
         
@@ -107,29 +107,29 @@ export default async (request, context) => {
         console.log(`  - 移除背景: ${options.removeBackground}`);
         console.log(`  - 网格分辨率: ${options.mcResolution}`);
 
-        // 使用TripoSR通过fal.ai API (这是目前可用的开源替代方案)
-        const falApiKey = process.env.FAL_API_KEY;
-        if (!falApiKey) {
-            throw new Error('FAL_API_KEY 环境变量未设置');
-        }
-
+        // 使用Tripo3D官方API
+        console.log(`[tripo-process-background] 🚀 任务 ${taskId}: 调用Tripo3D官方API`);
+        
         // 将base64转换为图片URL或直接使用data URI
         const imageUrl = imageBase64.startsWith('data:') ? imageBase64 : `data:image/png;base64,${imageBase64}`;
 
-        console.log(`[tripo-process-background] 🚀 任务 ${taskId}: 调用fal.ai TripoSR API`);
-        
-        const tripoResponse = await fetch('https://fal.run/fal-ai/triposr', {
+        const tripoResponse = await fetch('https://api.tripo3d.ai/v2/openapi/task', {
             method: 'POST',
             headers: {
-                'Authorization': `Key ${falApiKey}`,
+                'Authorization': `Bearer ${tripoApiKey}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                image_url: imageUrl,
-                output_format: options.outputFormat,
-                do_remove_background: options.removeBackground,
+                type: 'image_to_model',
+                file: {
+                    type: 'url',
+                    url: imageUrl
+                },
+                model_version: 'v2.0-20240919',
+                format: options.outputFormat || 'glb',
+                remove_background: options.removeBackground,
                 foreground_ratio: options.foregroundRatio,
-                mc_resolution: options.mcResolution
+                model_resolution: options.mcResolution
             })
         });
 
@@ -142,7 +142,49 @@ export default async (request, context) => {
         const tripoResult = await tripoResponse.json();
         console.log(`[tripo-process-background] ✅ 任务 ${taskId}: Tripo API调用成功`);
 
-        if (!tripoResult.model_mesh?.url) {
+        if (!tripoResult.data?.task_id) {
+            throw new Error('Tripo API未返回有效的任务ID');
+        }
+
+        const tripoTaskId = tripoResult.data.task_id;
+        console.log(`[tripo-process-background] 📋 任务 ${taskId}: Tripo任务ID: ${tripoTaskId}`);
+
+        // 轮询Tripo任务状态
+        let tripoTaskResult;
+        const maxWaitTime = 300000; // 5分钟
+        const pollInterval = 3000; // 3秒
+        const startTime = Date.now();
+
+        while (true) {
+            if (Date.now() - startTime > maxWaitTime) {
+                throw new Error('Tripo任务超时');
+            }
+
+            const statusResponse = await fetch(`https://api.tripo3d.ai/v2/openapi/task/${tripoTaskId}`, {
+                headers: {
+                    'Authorization': `Bearer ${tripoApiKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!statusResponse.ok) {
+                throw new Error(`查询Tripo任务状态失败: ${statusResponse.status}`);
+            }
+
+            tripoTaskResult = await statusResponse.json();
+            console.log(`[tripo-process-background] 📊 任务 ${taskId}: Tripo状态: ${tripoTaskResult.data.status}`);
+
+            if (tripoTaskResult.data.status === 'success') {
+                break;
+            } else if (tripoTaskResult.data.status === 'failed') {
+                throw new Error(`Tripo任务失败: ${tripoTaskResult.data.error || '未知错误'}`);
+            }
+
+            // 等待下次轮询
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
+
+        if (!tripoTaskResult.data.result?.model) {
             throw new Error('Tripo API未返回有效的模型文件');
         }
 
@@ -151,19 +193,18 @@ export default async (request, context) => {
         await store.setJSON(taskId, {
             ...taskDataFromBlob,
             status: 'completed',
-            modelUrl: tripoResult.model_mesh.url,
+            modelUrl: tripoTaskResult.data.result.model,
             format: options.outputFormat,
-            fileSize: tripoResult.model_mesh.file_size,
             completedAt: new Date().toISOString(),
             tripoResponse: {
-                timings: tripoResult.timings,
-                remeshingDir: tripoResult.remeshing_dir?.url
+                taskId: tripoTaskId,
+                preview: tripoTaskResult.data.result.preview
             }
         });
 
         console.log(`[tripo-process-background] ✅ 任务 ${taskId}: 3D模型生成完成`);
-        console.log(`  - 模型URL: ${tripoResult.model_mesh.url}`);
-        console.log(`  - 文件大小: ${tripoResult.model_mesh.file_size} bytes`);
+        console.log(`  - 模型URL: ${tripoTaskResult.data.result.model}`);
+        console.log(`  - 预览URL: ${tripoTaskResult.data.result.preview}`);
 
     } catch (error) {
         const errorDetail = `[tripo-process-background] ❌ 任务 ${taskId} 处理失败: ${error.message}`;

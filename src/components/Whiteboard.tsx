@@ -78,6 +78,29 @@ const Whiteboard = ({
     canvas.renderAll();
   }, [isDrawingMode]);
 
+  // 处理3D生成 - 移动到handleAIImageGenerated之前
+  const handle3DGenerateFromCanvas = useCallback(() => {
+    console.log('🎲 [handle3DGenerateFromCanvas] Generating 3D model from canvas...');
+    
+    const canvas = fabricCanvasRef.current;
+    if (!canvas) {
+      console.error('[Whiteboard] Canvas not available for 3D generation');
+      return;
+    }
+
+    // 生成画布快照
+    const dataURL = canvas.toDataURL({
+      format: 'png',
+      quality: 0.8,
+      multiplier: 1
+    });
+    
+    setTripo3DSnapshot(dataURL);
+    setIsTripo3DOpen(true);
+    
+    console.log('✅ [handle3DGenerateFromCanvas] Canvas snapshot created, opening 3D panel');
+  }, []);
+
   // --- Callbacks ---
 
   // Handler for brush size changes - 注释掉未使用的函数
@@ -136,6 +159,12 @@ const Whiteboard = ({
 
       canvas.add(fabricImage);
       canvas.renderAll();
+
+      // 🎲 AI生图完成后自动触发3D生成
+      console.log('🎨 [handleAIImageGenerated] AI图片生成完成，自动启动3D模型生成...');
+      setTimeout(() => {
+        handle3DGenerateFromCanvas();
+      }, 1000); // 延迟1秒让用户看到图片添加效果
     };
 
     img.onerror = () => {
@@ -144,7 +173,7 @@ const Whiteboard = ({
     };
 
     img.src = imageDataUrl;
-  }, []);
+  }, [handle3DGenerateFromCanvas]);
 
   // 处理图片上传
   const handleImageUploaded = useCallback((processedImage: ProcessedImage) => {
@@ -355,30 +384,6 @@ const Whiteboard = ({
     setFloatingMenuPosition(null); // 关闭菜单
   }, [floatingMenuPosition]);
 
-  // 处理3D生成
-  const handle3DGenerate = useCallback(() => {
-    console.log('🎲 [handle3DGenerate] Generating 3D model from canvas...');
-    
-    const canvas = fabricCanvasRef.current;
-    if (!canvas) {
-      console.error('[Whiteboard] Canvas not available for 3D generation');
-      return;
-    }
-
-    // 生成画布快照
-    const dataURL = canvas.toDataURL({
-      format: 'png',
-      quality: 0.8,
-      multiplier: 1
-    });
-    
-    setTripo3DSnapshot(dataURL);
-    setIsTripo3DOpen(true);
-    setFloatingMenuPosition(null); // 关闭菜单
-    
-    console.log('✅ [handle3DGenerate] Canvas snapshot created, opening 3D panel');
-  }, []);
-
   // 处理3D模型生成完成
   const handle3DModelGenerated = useCallback((modelUrl: string, format: string) => {
     console.log('🎉 [handle3DModelGenerated] 3D model generated:', modelUrl, format);
@@ -531,10 +536,6 @@ const Whiteboard = ({
           onStickyNoteClick={() => {
             console.log('📝 FloatingMenu sticky note clicked');
             handleStickyNoteCreated();
-          }}
-          on3DGenerateClick={() => {
-            console.log('🎲 FloatingMenu 3D generate clicked');
-            handle3DGenerate();
           }}
           onClose={() => setFloatingMenuPosition(null)}
         />
